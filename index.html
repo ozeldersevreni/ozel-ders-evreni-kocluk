@@ -689,7 +689,7 @@ window.generateAIPlan=async function(){
     else cq=cq.eq('grade',String(st.grade));
     const cat=await cq.order('subject').order('sort_order');
     if(cat.error) throw cat.error;
-    data.allowed_topics=(cat.data||[]).filter(x=>!v185Arr(st.excluded_subjects).map(v185Norm).includes(v185Norm(x.subject))).map(x=>({id:x.id,subject:x.subject,topic:x.topic}));data.excluded_subjects=v185Arr(st.excluded_subjects);
+    const effectiveExcluded=(st.program_type==='YKS'&&stage==='TYT')?v185Arr(st.excluded_subjects):[];data.allowed_topics=(cat.data||[]).filter(x=>!effectiveExcluded.map(v185Norm).includes(v185Norm(x.subject))).map(x=>({id:x.id,subject:x.subject,topic:x.topic}));data.excluded_subjects=effectiveExcluded;st.__effective_excluded_subjects=effectiveExcluded;st.__allowed_subjects=[...new Set(data.allowed_topics.map(x=>x.subject))];
     const prog=await sb.from('student_topic_progress').select('topic_id,progress_percent,status,questions_solved,last_exam_percent,ai_note,coach_note').eq('student_id',sid);
     if(prog.error) throw prog.error;
     data.topic_progress=prog.data||[];
@@ -866,7 +866,8 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 </body></html>
 <script id="v1855InfoDefinitiveFix">
-// V18.5.6 - self-contained Student Information flow.
+// \n
+V18.5.6 - self-contained Student Information flow.
 // No dependency on V18.5 subject catalog helpers or legacy table-cell state.
 (function(){
   const SUBJECTS=['Türkçe','Matematik','Geometri','Tarih','Coğrafya','Felsefe','Din Kültürü','Fizik','Kimya','Biyoloji','Edebiyat','İngilizce'];
@@ -980,5 +981,89 @@ document.addEventListener('DOMContentLoaded',()=>{
     exclusive(strong,weak);exclusive(weak,strong);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wire);else wire();
+})();
+</script>
+<style id="v186Styles">
+/* Program exclusions belong to Weekly Program settings, not Student Information. */
+#infoExcludedChecks,#nsExcludedChecks{display:none!important}
+#infoExcludedChecks+*,#nsExcludedChecks+*{display:none!important}
+#infoModal .field:has(> label + #infoExcludedChecks),#newStudentModal .field:has(> label + #nsExcludedChecks){display:none!important}
+.weekRuleBox{margin:14px 0;padding:14px;border:1px solid #cfe0ff;background:#f7faff;border-radius:14px}
+.weekRuleTitle{font-weight:800;margin-bottom:5px}.weekRuleHelp{font-size:13px;color:#52627a;margin-bottom:10px}.weekRuleActions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}.weekRuleSaved{font-size:13px;color:#16794a;font-weight:700}
+</style>
+<script id="v186WeeklyRules">
+(function(){
+  const arr=v=>Array.isArray(v)?v:String(v||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const norm=s=>String(s||'').trim().toLocaleLowerCase('tr-TR');
+  const esc=s=>String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  let ruleStudent=null;
+  async function subjectsFor(st){
+    let q=sb.from('subject_topics').select('subject').eq('program_type',st.program_type);
+    if(st.program_type==='YKS') q=q.eq('exam_stage','TYT');
+    else if(st.program_type==='LGS') q=q.eq('grade','8');
+    else q=q.eq('grade',String(st.grade||''));
+    const r=await q;if(r.error)throw r.error;
+    return [...new Set((r.data||[]).map(x=>x.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+  }
+  async function renderWeeklyRules(){
+    const sid=document.getElementById('scheduleStudent')?.value;
+    const box=document.getElementById('weeklyRuleBox');if(!box||!sid)return;
+    box.innerHTML='<div class="weekRuleHelp">Program kuralları yükleniyor…</div>';
+    try{
+      const r=await sb.from('students').select('id,program_type,exam_stage,field,grade,excluded_subjects').eq('id',sid).single();
+      if(r.error)throw r.error;const st=r.data;ruleStudent=st;
+      const stage=String(st.exam_stage||'TYT').toUpperCase().replace('YKS - ','').replace('YKS ','').trim();
+      if(st.program_type==='YKS'&&stage==='TYT'){
+        const subs=await subjectsFor(st), selected=new Set(arr(st.excluded_subjects).map(norm));
+        box.innerHTML='<div class="weekRuleTitle">🚫 Programa Eklenmeyecek Dersler</div><div class="weekRuleHelp">TYT’de tüm dersler kullanılabilir. Burada işaretlediğin dersler, işareti kaldırana kadar bu öğrencinin haftalık programına eklenmez.</div><div id="weeklyExcludedChecks" class="subjectChecks">'+subs.map(x=>'<label class="subjectCheck"><input type="checkbox" value="'+esc(x)+'" '+(selected.has(norm(x))?'checked':'')+'> '+esc(x)+'</label>').join('')+'</div><div class="weekRuleActions"><button type="button" class="primary" id="saveWeeklyRulesBtn">Seçimi Kaydet</button><span id="weeklyRuleSaved" class="weekRuleSaved"></span></div>';
+        document.getElementById('saveWeeklyRulesBtn').onclick=saveWeeklyRules;
+      }else if(st.program_type==='YKS'){
+        const field=esc(st.field||'alan');
+        box.innerHTML='<div class="weekRuleTitle">🎯 Alan Dersleri Otomatik</div><div class="weekRuleHelp">'+esc(stage)+' programında dersler öğrencinin <b>'+field+'</b> alanına göre otomatik seçilir. TYT’deki ek ders çıkarma ayarı burada uygulanmaz.</div>';
+      }else{
+        box.innerHTML='<div class="weekRuleTitle">🎯 Program Dersleri Otomatik</div><div class="weekRuleHelp">Bu program türünde dersler sınav/sınıf yapısına göre otomatik seçilir.</div>';
+      }
+    }catch(e){box.innerHTML='<div class="weekRuleHelp">Program kuralları yüklenemedi: '+esc(e?.message||e)+'</div>'}
+  }
+  async function saveWeeklyRules(){
+    const sid=document.getElementById('scheduleStudent')?.value;if(!sid)return alert('Öğrenci seçilemedi.');
+    const btn=document.getElementById('saveWeeklyRulesBtn');const selected=[...document.querySelectorAll('#weeklyExcludedChecks input:checked')].map(x=>x.value);
+    try{if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…'}const r=await sb.from('students').update({excluded_subjects:selected,updated_at:new Date().toISOString()}).eq('id',sid);if(r.error)throw r.error;const ok=document.getElementById('weeklyRuleSaved');if(ok)ok.textContent='✓ Kaydedildi';if(ruleStudent)ruleStudent.excluded_subjects=selected;}
+    catch(e){alert('Program kuralı kaydedilemedi: '+(e?.message||e))}finally{if(btn){btn.disabled=false;btn.textContent='Seçimi Kaydet'}}
+  }
+  window.saveWeeklyRules=saveWeeklyRules;
+  const oldLoad=window.loadScheduleForStudent;
+  window.loadScheduleForStudent=async function(){const r=await oldLoad.apply(this,arguments);await renderWeeklyRules();return r};
+  // Deterministic final task filter: TYT uses coach exclusions; AYT/YDT use catalog/field scope only.
+  window.validateAITasks=function(raw,student,week,planId){
+    const stage=String(student?.exam_stage||'TYT').toUpperCase().replace('YKS - ','').replace('YKS ','').trim();
+    const forbidden=(student?.program_type==='YKS'&&stage==='TYT')?arr(student.__effective_excluded_subjects||student.excluded_subjects).map(norm):[];
+    const allowed=(student?.program_type==='YKS'&&stage!=='TYT'&&Array.isArray(student.__allowed_subjects))?new Set(student.__allowed_subjects.map(norm)):null;
+    const maxDaily=Math.max(60,Number(student.daily_minutes)||180),used={},seen=new Set(),out=[];
+    for(let i=0;i<Math.min((raw||[]).length,40);i++){
+      const t=raw[i]||{},subj=String(t.subject||'').trim(),ns=norm(subj);if(!subj||forbidden.includes(ns)||(allowed&&!allowed.has(ns)))continue;
+      let d=t.task_date;if(!d||d<week||d>addDaysISO(week,6))d=addDaysISO(week,Math.min(i,6));
+      const st=String(t.start_time||'').slice(0,5),en=String(t.end_time||'').slice(0,5),a=hmToMin(st),b=hmToMin(en);if(a==null||b==null||b<=a)continue;
+      used[d]=used[d]||[];if(used[d].some(x=>a<x.b&&b>x.a))continue;if(used[d].reduce((z,x)=>z+x.b-x.a,0)+(b-a)>maxDaily)continue;
+      const key=[d,ns,norm(t.topic)].join('|');if(seen.has(key))continue;seen.add(key);used[d].push({a,b});out.push({plan_id:planId,student_id:student.id,task_date:d,start_time:st,end_time:en,subject:subj,topic:String(t.topic||''),description:String(t.description||''),target_questions:Number.isFinite(+t.target_questions)?+t.target_questions:null,status:'pending'});
+    }return out;
+  };
+  // Student Information saves student information only; weekly exclusions are intentionally untouched.
+  window.saveInfo=async function(){
+    const id=window.activeStudentId;if(!id)return alert('Öğrenci seçilemedi.');
+    const v=id=>document.getElementById(id), picked=id=>[...document.querySelectorAll('#'+id+' input[type="checkbox"]:checked')].map(x=>x.value);
+    const raw=v('infoHours')?.value??'',hours=raw===''?null:Number(raw);if(hours!==null&&(!Number.isFinite(hours)||hours<0))return alert('Günlük çalışma süresini kontrol edin.');
+    const strong=picked('infoStrongChecks'),weak=picked('infoWeakChecks'),overlap=strong.filter(x=>weak.includes(x));if(overlap.length)return alert('Aynı ders hem Güçlü hem Eksik seçilemez: '+overlap.join(', '));
+    const payload={target:v('infoGoal')?.value.trim()||null,daily_minutes:hours===null?null:Math.round(hours*60),strong_subjects:strong.join(', ')||null,weak_subjects:weak.join(', ')||null,coach_notes:v('infoNote')?.value.trim()||null,school_status:v('infoSchoolStatus')?.value||'school',student_phone:v('infoStudentPhone')?.value.trim()||null,parent_name:v('infoParentName')?.value.trim()||null,parent_phone:v('infoParentPhone')?.value.trim()||null,updated_at:new Date().toISOString()};
+    const coach=v('infoCoach')?.value;if((window.currentProfile?.role==='admin'||(typeof currentProfile!=='undefined'&&currentProfile?.role==='admin'))&&coach)payload.coach_id=coach;
+    try{const b=document.querySelector('#infoModal .modalactions button.green');if(b){b.disabled=true;b.textContent='Kaydediliyor…'}const r=await sb.from('students').update(payload).eq('id',id);if(r.error)throw r.error;alert('Öğrenci bilgileri kaydedildi.');document.getElementById('infoModal')?.classList.remove('show');if(typeof loadCloudStudents==='function')await loadCloudStudents();}
+    catch(e){alert('Bilgiler kaydedilemedi: '+(e?.message||e))}finally{const b=document.querySelector('#infoModal .modalactions button.green');if(b){b.disabled=false;b.textContent='Kaydet'}}
+  };
+  function init(){
+    document.querySelectorAll('#infoExcludedChecks,#nsExcludedChecks').forEach(x=>{const f=x.closest('.field');if(f)f.style.display='none'});
+    const toolbar=document.querySelector('#scheduleModal .scheduleToolbar');if(toolbar&&!document.getElementById('weeklyRuleBox')){const d=document.createElement('div');d.id='weeklyRuleBox';d.className='weekRuleBox';toolbar.insertAdjacentElement('afterend',d)}
+    const x=document.getElementById('syncState');if(x){x.querySelectorAll('[id$="Build"]').forEach(e=>e.remove());x.insertAdjacentHTML('beforeend',' <span id="v186Build" style="opacity:.55">• V18.6</span>')}
+  }
+  document.addEventListener('DOMContentLoaded',init);
 })();
 </script>
