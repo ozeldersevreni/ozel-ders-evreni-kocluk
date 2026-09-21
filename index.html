@@ -459,7 +459,7 @@ const __deleteWeeklyPlanV174=deleteWeeklyPlan;deleteWeeklyPlan=async function(pl
 };
 </script>
 <script>
-// V17.7 — sade kayıt + öğretmen eşleştirme
+// V17.8.1 — sade kayıt + öğretmen eşleştirme
 function toggleStudentRegistrationProgram(){const p=document.getElementById('authProgram')?.value;const y=p==='YKS';document.getElementById('authStageWrap')?.classList.toggle('hidden',!y);document.getElementById('authFieldWrap')?.classList.toggle('hidden',!y)}
 async function loadActiveCoachesForRegistration(){const sel=document.getElementById('authCoach');if(!sel)return;sel.innerHTML='<option value="">Yükleniyor…</option>';try{const r=await sb.rpc('list_active_coaches_for_signup');if(r.error)throw r.error;const opts=(r.data||[]).map(function(x){return '<option value="'+x.id+'">'+escapeHtml(x.full_name||'Eğitim Koçu / Öğretmen')+'</option>';}).join('');sel.innerHTML='<option value="">Seçiniz</option>'+opts;}catch(e){sel.innerHTML='<option value="">Öğretmen listesi alınamadı</option>';}}
 function toggleRegistrationFields(){const isStudent=authAction==='register'&&document.getElementById('authRole')?.value==='student';document.getElementById('studentRegistrationFields')?.classList.toggle('hidden',!isStudent);if(isStudent){toggleStudentRegistrationProgram();loadActiveCoachesForRegistration();}}
@@ -525,7 +525,13 @@ loadCloudStudents=async function(){
    if(ids.length){const pr=await sb.from('profiles').select('id,status').in('id',ids);if(!pr.error)(pr.data||[]).forEach(p=>{if(p.status==='active')activeIds.add(p.id)});}
    rows=rows.filter(x=>!x.student_user_id||activeIds.has(x.student_user_id));
  }
- renderStudents(rows.map(dbToStudent));syncState.textContent='☁️ Bulut ile senkronize';
+ if(currentProfile?.role==='admin'){
+   const tr=await sb.from('profiles').select('id,full_name,status').eq('role','coach').in('status',['active','disabled']).order('full_name',{ascending:true});
+   renderStudentsGrouped(rows,tr.error?[]:(tr.data||[]));
+ }else{
+   renderStudents(rows.map(dbToStudent));
+ }
+ syncState.textContent='☁️ Bulut ile senkronize';
  try{if(typeof refreshHomeApprovals==='function')await refreshHomeApprovals();}catch(e){}
  try{await refreshApprovedTeachers();}catch(e){}
 };
