@@ -189,6 +189,53 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;background:#f4f7fb}html
 @media(orientation:landscape) and (max-height:520px){.authOverlay{align-items:flex-start}.authBrandLogo{width:72px;height:72px}.modal{align-items:flex-start}}
 
 </style></head><body><h1>ÖZEL DERS EVRENİ EĞİTİM KOÇLUĞU</h1>${c}
+
+<script id="v1791-session-ai-safety">
+// V17.9.1 — an in-app JavaScript error must never look like a logout.
+window.addEventListener('error', function(){
+  try{
+    if(window.currentProfile || (typeof currentProfile!=='undefined' && currentProfile)){
+      var a=document.getElementById('authOverlay'); if(a) a.classList.add('hidden');
+    }
+  }catch(_){}
+});
+window.addEventListener('unhandledrejection', function(){
+  try{
+    if(window.currentProfile || (typeof currentProfile!=='undefined' && currentProfile)){
+      var a=document.getElementById('authOverlay'); if(a) a.classList.add('hidden');
+    }
+  }catch(_){}
+});
+// Weekly-program launch is ID-based and does not depend on grouped table row positions.
+openAIForSchedule=async function(){
+  try{
+    if(!canManagePlans())return alert('Programı yalnızca yönetici veya koç oluşturabilir.');
+    var scheduleSel=document.getElementById('scheduleStudent');
+    var sid=scheduleSel&&scheduleSel.value;
+    if(!sid)return alert('Öğrenci seçin.');
+    aiTargetWeek=scheduleTargetWeek();
+    var aiSel=document.getElementById('aiStudent');
+    if(!aiSel)throw new Error('Program oluşturma öğrenci alanı bulunamadı.');
+    var st=await sb.from('students').select('id,full_name,program_type,exam_stage,field').eq('id',sid).single();
+    if(st.error)throw st.error;
+    var x=st.data||{};
+    var program=x.program_type==='YKS' ? ('YKS - '+(x.exam_stage||'TYT')) : (x.program_type||'');
+    aiSel.innerHTML='<option value="'+escapeHtml(x.id)+'">'+escapeHtml((x.full_name||'Öğrenci')+(program?' • '+program:'')+(x.field?' • '+x.field:''))+'</option>';
+    aiSel.value=sid;
+    var title=document.querySelector('#aiPlanModal h2');
+    if(title)title.textContent='📅 '+trDateFinal(aiTargetWeek)+' Haftası Program Oluşturma';
+    var p=document.getElementById('aiStatus')||document.createElement('p');
+    p.id='aiStatus';
+    p.innerHTML='<b>Hedef hafta:</b> '+trDateFinal(aiTargetWeek)+'<br><small>Kayıtlı okul ders programı varsa otomatik kullanılacaktır. Değiştiyse aşağıdan yeni fotoğraf seçin.</small>';
+    if(!p.parentNode){var actions=document.querySelector('#aiPlanModal .modalactions');if(!actions)throw new Error('Program oluşturma penceresi bulunamadı.');actions.before(p);}
+    var modal=document.getElementById('aiPlanModal');if(!modal)throw new Error('Program oluşturma penceresi bulunamadı.');
+    modal.classList.add('show');
+  }catch(e){
+    var a=document.getElementById('authOverlay');if(a&&typeof currentProfile!=='undefined'&&currentProfile)a.classList.add('hidden');
+    alert('Program oluşturma ekranı açılamadı: '+(e&&e.message?e.message:e));
+  }
+};
+</script>
 </body></html>`);w.document.close();w.print()}
 
 (function(){
@@ -318,7 +365,7 @@ function openAIForSchedule(){
   aiTargetWeek=scheduleTargetWeek();
   const sel=document.getElementById('aiStudent');sel.innerHTML=studentOptionsHtml();sel.value=sid;
   if(sel.value!==sid)return alert('Öğrenci AI ekranına aktarılamadı. Sayfayı yenileyip tekrar deneyin.');
-  const title=document.querySelector('#aiPlanModal h2');if(title)title.textContent='🤖 '+trDateFinal(aiTargetWeek)+' Haftası AI Programı';
+  const title=document.querySelector('#aiPlanModal h2');if(title)title.textContent='📅 '+trDateFinal(aiTargetWeek)+' Haftası Program Oluşturma';
   const p=document.getElementById('aiStatus')||document.createElement('p');p.id='aiStatus';p.innerHTML='<b>Hedef hafta:</b> '+trDateFinal(aiTargetWeek)+'<br><small>Kayıtlı okul ders programı varsa otomatik kullanılacaktır. Değiştiyse aşağıdan yeni fotoğraf seçin.</small>';
   if(!p.parentNode)document.querySelector('#aiPlanModal .modalactions').before(p);
   document.getElementById('aiPlanModal').classList.add('show');
@@ -329,7 +376,7 @@ async function loadScheduleForStudent(){
  box.textContent='Program yükleniyor…';const target=scheduleTargetWeek();
  const {data:plan,error}=await sb.from('study_plans').select('id,student_id,week_start,status').eq('student_id',sid).eq('week_start',target).maybeSingle();if(error){box.textContent='Program alınamadı: '+error.message;return}
  const nav=`<div class="toolbar"><button class="secondary" onclick="changeScheduleWeek(-1)">← Önceki Hafta</button><button class="secondary" onclick="changeScheduleWeek(0,true)">Bu Hafta</button><button class="secondary" onclick="changeScheduleWeek(1)">Sonraki Hafta →</button></div>`;
- const ai=canManagePlans()?`<div class="finalAiBar"><button class="primary" onclick="openAIForSchedule()">🤖 ${scheduleWeekOffset>0?'Önümüzdeki Haftanın Programını Oluştur':'Bu Hafta İçin AI Programı Oluştur'}</button><span class="info">📷 Okul ders programı AI ekranında kayıtlı fotoğraftan otomatik kullanılır; değiştiyse yeni fotoğraf yükleyebilirsiniz.</span></div>`:'';
+ const ai=canManagePlans()?`<div class="finalAiBar"><button class="primary" onclick="openAIForSchedule()">📅 ${scheduleWeekOffset>0?'Önümüzdeki Haftanın Programını Oluştur':'Bu Haftanın Programını Oluştur'}</button><span class="info">📷 Kayıtlı okul ders programı fotoğrafı otomatik kullanılır; değiştiyse yeni fotoğraf yükleyebilirsiniz.</span></div>`:'';
  if(!plan){box.innerHTML=nav+ai+`<b>${trDateFinal(target)} haftasında kayıtlı program yok.</b>`;return}
  const {data:tasks,error:te}=await sb.from('study_tasks').select('id,task_date,start_time,end_time,subject,topic,description,target_questions,status').eq('plan_id',plan.id).order('task_date').order('start_time');if(te){box.textContent='Görevler alınamadı: '+te.message;return}
  const dayNames=['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'],today=new Date().toISOString().slice(0,10),startDate=new Date(plan.week_start+'T12:00:00');
@@ -573,4 +620,51 @@ window.addEventListener('load',()=>{
     if(currentProfile?.role==='admin' && typeof loadCloudStudents==='function') loadCloudStudents();
   },250);
 });
-</script></body></html>
+</script>
+<script id="v1791-session-ai-safety">
+// V17.9.1 — an in-app JavaScript error must never look like a logout.
+window.addEventListener('error', function(){
+  try{
+    if(window.currentProfile || (typeof currentProfile!=='undefined' && currentProfile)){
+      var a=document.getElementById('authOverlay'); if(a) a.classList.add('hidden');
+    }
+  }catch(_){}
+});
+window.addEventListener('unhandledrejection', function(){
+  try{
+    if(window.currentProfile || (typeof currentProfile!=='undefined' && currentProfile)){
+      var a=document.getElementById('authOverlay'); if(a) a.classList.add('hidden');
+    }
+  }catch(_){}
+});
+// Weekly-program launch is ID-based and does not depend on grouped table row positions.
+openAIForSchedule=async function(){
+  try{
+    if(!canManagePlans())return alert('Programı yalnızca yönetici veya koç oluşturabilir.');
+    var scheduleSel=document.getElementById('scheduleStudent');
+    var sid=scheduleSel&&scheduleSel.value;
+    if(!sid)return alert('Öğrenci seçin.');
+    aiTargetWeek=scheduleTargetWeek();
+    var aiSel=document.getElementById('aiStudent');
+    if(!aiSel)throw new Error('Program oluşturma öğrenci alanı bulunamadı.');
+    var st=await sb.from('students').select('id,full_name,program_type,exam_stage,field').eq('id',sid).single();
+    if(st.error)throw st.error;
+    var x=st.data||{};
+    var program=x.program_type==='YKS' ? ('YKS - '+(x.exam_stage||'TYT')) : (x.program_type||'');
+    aiSel.innerHTML='<option value="'+escapeHtml(x.id)+'">'+escapeHtml((x.full_name||'Öğrenci')+(program?' • '+program:'')+(x.field?' • '+x.field:''))+'</option>';
+    aiSel.value=sid;
+    var title=document.querySelector('#aiPlanModal h2');
+    if(title)title.textContent='📅 '+trDateFinal(aiTargetWeek)+' Haftası Program Oluşturma';
+    var p=document.getElementById('aiStatus')||document.createElement('p');
+    p.id='aiStatus';
+    p.innerHTML='<b>Hedef hafta:</b> '+trDateFinal(aiTargetWeek)+'<br><small>Kayıtlı okul ders programı varsa otomatik kullanılacaktır. Değiştiyse aşağıdan yeni fotoğraf seçin.</small>';
+    if(!p.parentNode){var actions=document.querySelector('#aiPlanModal .modalactions');if(!actions)throw new Error('Program oluşturma penceresi bulunamadı.');actions.before(p);}
+    var modal=document.getElementById('aiPlanModal');if(!modal)throw new Error('Program oluşturma penceresi bulunamadı.');
+    modal.classList.add('show');
+  }catch(e){
+    var a=document.getElementById('authOverlay');if(a&&typeof currentProfile!=='undefined'&&currentProfile)a.classList.add('hidden');
+    alert('Program oluşturma ekranı açılamadı: '+(e&&e.message?e.message:e));
+  }
+};
+</script>
+</body></html>
