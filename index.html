@@ -799,7 +799,7 @@ document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('#v1
 
 
 <script id="v1854InfoFix">
-// V18.5.4 - single-source Student Information entry points.
+// V18.5.5 - single-source Student Information entry points.
 // Both the dashboard button and Student Management Center call the same ID-based function.
 window.openInfo = async function(studentId){
   const modal=document.getElementById('infoModal');
@@ -837,7 +837,7 @@ window.openInfo = async function(studentId){
     }
     return true;
   }catch(e){
-    console.error('V18.5.4 openInfo',e);
+    console.error('V18.5.5 openInfo',e);
     // Keep the modal visible so failures never look like a dead/closing button.
     alert('Öğrenci bilgileri yüklenemedi: '+(e?.message||e));
     return false;
@@ -860,8 +860,73 @@ window.closeInfo=function(){document.getElementById('infoModal')?.classList.remo
 document.addEventListener('DOMContentLoaded',()=>{
   document.querySelectorAll('#v184Build,#v185Build,#v1854Build').forEach(x=>x.remove());
   const x=document.getElementById('syncState');
-  if(x)x.insertAdjacentHTML('beforeend',' <span id="v1854Build" style="opacity:.55">• V18.5.4</span>');
+  if(x)x.insertAdjacentHTML('beforeend',' <span id="v1854Build" style="opacity:.55">• V18.5.5</span>');
 });
 </script>
 
 </body></html>
+<script id="v1855InfoDefinitiveFix">
+// V18.5.5 - self-contained Student Information flow.
+// No dependency on V18.5 subject catalog helpers or legacy table-cell state.
+(function(){
+  const SUBJECTS=['Türkçe','Matematik','Geometri','Tarih','Coğrafya','Felsefe','Din Kültürü','Fizik','Kimya','Biyoloji','Edebiyat','İngilizce'];
+  let infoStudentId=null;
+  const arr=v=>Array.isArray(v)?v:String(v||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const norm=s=>String(s||'').trim().toLocaleLowerCase('tr-TR');
+  function checks(boxId, selected){
+    const box=document.getElementById(boxId); if(!box)return;
+    const set=new Set(arr(selected).map(norm));
+    box.innerHTML=SUBJECTS.map((s,i)=>`<label class="subjectCheck"><input type="checkbox" value="${s.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" ${set.has(norm(s))?'checked':''}> ${s}</label>`).join('');
+  }
+  function picked(boxId){return [...document.querySelectorAll('#'+boxId+' input[type="checkbox"]:checked')].map(x=>x.value)}
+  window.openInfo=async function(studentId){
+    const modal=document.getElementById('infoModal');
+    if(!modal)return alert('Öğrenci Bilgileri penceresi bulunamadı.');
+    if(!studentId)return alert('Öğrenci seçilemedi.');
+    infoStudentId=studentId; window.activeStudentId=studentId;
+    modal.style.zIndex='10000'; modal.classList.add('show');
+    try{
+      const {data:d,error}=await sb.from('students').select('target,daily_minutes,strong_subjects,weak_subjects,excluded_subjects,coach_notes,school_status,student_phone,parent_name,parent_phone,coach_id').eq('id',studentId).single();
+      if(error)throw error;
+      const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''};
+      set('infoGoal',d?.target||''); set('infoHours',d?.daily_minutes==null?'':Number(d.daily_minutes)/60);
+      set('infoNote',d?.coach_notes||''); set('infoSchoolStatus',d?.school_status||'school');
+      set('infoStudentPhone',d?.student_phone||''); set('infoParentName',d?.parent_name||''); set('infoParentPhone',d?.parent_phone||'');
+      checks('infoStrongChecks',d?.strong_subjects); checks('infoWeakChecks',d?.weak_subjects); checks('infoExcludedChecks',d?.excluded_subjects);
+      const wrap=document.getElementById('infoCoachWrap'),sel=document.getElementById('infoCoach');
+      if(wrap&&sel){const admin=currentProfile?.role==='admin';wrap.style.display=admin?'flex':'none';if(admin){
+        const {data:teachers,error:te}=await sb.from('profiles').select('id,full_name,status').eq('role','coach').in('status',['active','disabled']).order('full_name');
+        if(te)throw te; sel.innerHTML='<option value="">Atanmamış</option>'+(teachers||[]).map(t=>`<option value="${t.id}">${escapeHtml(t.full_name||'Öğretmen')}${t.status==='disabled'?' (Pasif)':''}</option>`).join('');sel.value=d?.coach_id||'';
+      }}
+    }catch(e){console.error('V18.5.5 openInfo',e);alert('Öğrenci bilgileri yüklenemedi: '+(e?.message||e));}
+  };
+  window.editInfo=function(btn){const id=btn?.closest?.('tr')?.dataset?.id;if(!id)return alert('Öğrenci seçilemedi.');return window.openInfo(id)};
+  const previousCenter=window.centerAction;
+  window.centerAction=function(type){
+    if(type==='info'){
+      let id=null; try{id=centerStudentId}catch(_){id=null}
+      id=id||window.activeCenterStudentId||null;
+      if(!id)return alert('Öğrenci seçilemedi.');
+      return window.openInfo(id);
+    }
+    return previousCenter.apply(this,arguments);
+  };
+  window.saveInfo=async function(){
+    const id=infoStudentId||window.activeStudentId;if(!id)return alert('Öğrenci seçilemedi.');
+    const hours=document.getElementById('infoHours').value===''?null:Number(document.getElementById('infoHours').value);
+    if(hours!==null&&(!Number.isFinite(hours)||hours<0))return alert('Günlük çalışma süresini kontrol edin.');
+    const payload={
+      target:document.getElementById('infoGoal').value.trim()||null,daily_minutes:hours===null?null:Math.round(hours*60),
+      strong_subjects:picked('infoStrongChecks').join(', ')||null,weak_subjects:picked('infoWeakChecks').join(', ')||null,
+      excluded_subjects:picked('infoExcludedChecks'),coach_notes:document.getElementById('infoNote').value.trim()||null,
+      school_status:document.getElementById('infoSchoolStatus').value,student_phone:document.getElementById('infoStudentPhone').value.trim()||null,
+      parent_name:document.getElementById('infoParentName').value.trim()||null,parent_phone:document.getElementById('infoParentPhone').value.trim()||null,updated_at:new Date().toISOString()
+    };
+    if(currentProfile?.role==='admin')payload.coach_id=document.getElementById('infoCoach').value||null;
+    const {error}=await sb.from('students').update(payload).eq('id',id);if(error)return alert('Bilgiler kaydedilemedi: '+error.message);
+    document.getElementById('infoModal').classList.remove('show');await loadCloudStudents();
+  };
+  window.closeInfo=function(){document.getElementById('infoModal')?.classList.remove('show')};
+  document.addEventListener('DOMContentLoaded',()=>{const x=document.getElementById('syncState');if(x){x.querySelectorAll('[id$="Build"]').forEach(e=>e.remove());x.insertAdjacentHTML('beforeend',' <span id="v1855Build" style="opacity:.55">• V18.5.5</span>')}});
+})();
+</script>
