@@ -287,7 +287,7 @@ renderExamCountdowns=function(){paint('adminCountdown',activeExamType());paint('
 const oldEditInfo=editInfo;editInfo=function(btn){oldEditInfo(btn);const id=rowId(btn.closest('tr'));sb.from('students').select('school_status').eq('id',id).single().then(({data})=>{if(data)document.getElementById('infoSchoolStatus').value=data.school_status||'school'})};
 const oldSaveInfo=saveInfo;saveInfo=async function(){if(!activeInfoCell)return;let row=activeInfoCell.closest('tr'),id=rowId(row),status=document.getElementById('infoSchoolStatus').value;const {error}=await sb.from('students').update({school_status:status,updated_at:new Date().toISOString()}).eq('id',id);if(error)return alert('Öğrenci durumu güncellenemedi: '+error.message);await oldSaveInfo()};
 // AI receives exam date, written exams and mocks.
-const oldGenerateAIPlan=generateAIPlan;generateAIPlan=async function(){let data=studentPayload();if(!data?.id)return alert('Önce öğrenci seçin.');try{const [{data:s},{data:w},{data:m}]=await Promise.all([sb.from('students').select('school_status,program_type').eq('id',data.id).single(),sb.from('written_exams').select('subject,exam_date').eq('student_id',data.id).gte('exam_date',new Date().toISOString().slice(0,10)).order('exam_date').limit(20),sb.from('mock_exams').select('exam_date,exam_type,exam_name,total_net').eq('student_id',data.id).order('exam_date',{ascending:false}).limit(10)]);data.school_status=s?.school_status||'school';data.written_exams=w||[];data.mock_exams=m||[];data.main_exam_date=examDatesCache[s?.program_type==='LGS'?'LGS':'YKS']||null;window.__v161AiExtra=data}catch(e){}return oldGenerateAIPlan()};
+const oldGenerateAIPlan=generateAIPlan;generateAIPlan=async function(){let data=studentPayload();if(!data?.id)return alert('Önce öğrenci seçin.');try{const [{data:s},{data:w},{data:m}]=await Promise.all([sb.from('students').select('school_status,program_type').eq('id',data.id).single(),sb.from('written_exams').select('subject,exam_date').eq('student_id',data.id).gte('exam_date',new Date().toISOString().slice(0,10)).order('exam_date').limit(20),sb.from('mock_exams').select('exam_date,exam_type,exam_name,total_net').eq('student_id',data.id).order('exam_date',{ascending:false}).limit(10)]);data.school_status=s?.school_status||'school';data.written_exams=w||[];data.mock_exams=m||[];data.main_exam_date=(typeof examDatesCache!=='undefined'&&examDatesCache?examDatesCache[s?.program_type==='LGS'?'LGS':'YKS']:null)||null;window.__v161AiExtra=data}catch(e){}return oldGenerateAIPlan()};
 </script>
 <script>
 // V16.2 production fixes: modal student creation, role-safe student view, shared exam dates.
@@ -403,7 +403,7 @@ async function generateAIPlan(){
    sb.from('mock_exams').select('exam_date,exam_type,exam_name,total_correct,total_wrong,total_blank,total_net').eq('student_id',data.id).order('exam_date',{ascending:false}).limit(10),
    sb.from('students').select('school_status,program_type').eq('id',data.id).single()
   ]);if(se)throw se;
-  data={...data,...st,target_week_start:week,previous_week_tasks:prevTasks||[],written_exams:w||[],mock_exams:m||[],main_exam_date:examDatesCache[srow?.program_type==='LGS'?'LGS':'YKS']||null};data.allowed_topics=await getCatalogForStudent(data);data.topic_progress=await getProgressForAI(data.id);
+  data={...data,...st,target_week_start:week,previous_week_tasks:prevTasks||[],written_exams:w||[],mock_exams:m||[],main_exam_date:(typeof examDatesCache!=='undefined'&&examDatesCache?examDatesCache[srow?.program_type==='LGS'?'LGS':'YKS']:null)||null};data.allowed_topics=await getCatalogForStudent(data);data.topic_progress=await getProgressForAI(data.id);
   const res=await fetch('https://ozel-ders-evreni-ai.mrylmz0636.workers.dev/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:data,image})});const result=await res.json().catch(()=>({}));if(!res.ok)throw new Error(result.error||'Program oluşturma servisine ulaşılamadı.');if(!Array.isArray(result.tasks)||!result.tasks.length)throw new Error('Program görev listesi üretilemedi.');
   let {data:plan,error:pe}=await sb.from('study_plans').select('id,status').eq('student_id',st.id).eq('week_start',week).maybeSingle();if(pe)throw pe;if(plan?.status==='published')throw new Error('Bu hafta zaten öğrenciye yayınlanmış. Yeniden oluşturmak için önce mevcut haftalık programı arşivleyip silin.');if(plan){const del=await sb.from('study_tasks').delete().eq('plan_id',plan.id);if(del.error)throw del.error;const up=await sb.from('study_plans').update({coach_id:st.coach_id,status:'draft',updated_at:new Date().toISOString()}).eq('id',plan.id);if(up.error)throw up.error}else{const x=await sb.from('study_plans').insert({student_id:st.id,coach_id:st.coach_id,week_start:week,status:'draft'}).select('id').single();if(x.error)throw x.error;plan=x.data}
   const tasks=validateAITasks(result.tasks,st,week,plan.id);if(!tasks.length)throw new Error('Oluşturulan program kurallara uygun görev üretmedi.');const ins=await sb.from('study_tasks').insert(tasks);if(ins.error)throw ins.error;
@@ -653,5 +653,13 @@ openAIForSchedule=async function(){
     alert('Program oluşturma ekranı açılamadı: '+(e&&e.message?e.message:e));
   }
 };
+</script>
+
+<script id="v181-runtime-fix">
+window.__APP_BUILD='V18.1';
+document.addEventListener('DOMContentLoaded',function(){
+  var x=document.getElementById('syncState');
+  if(x && !document.getElementById('v181Build')) x.insertAdjacentHTML('beforeend',' <span id="v181Build" style="opacity:.55">• V18.1</span>');
+});
 </script>
 </body></html>
