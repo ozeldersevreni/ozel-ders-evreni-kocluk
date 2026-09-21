@@ -223,6 +223,84 @@ openAIForSchedule=async function(){
 // Visible build marker helps verify GitHub Pages is serving the new file; kept subtle.
 document.addEventListener('DOMContentLoaded',()=>{const x=document.getElementById('syncState');if(x&&!x.dataset.build){x.dataset.build='1';x.insertAdjacentHTML('beforeend',' <span style="opacity:.55">• V18.0</span>');}});
 </script>
+
+<script id="v182-definitive-program-fix">
+// V18.2 — definitive weekly program generator. This final override deliberately
+// does not depend on the legacy examDatesCache variable or earlier generator wrappers.
+window.__APP_BUILD='V18.2';
+async function getMainExamDateForProgram(programType){
+  try{
+    const key=programType==='LGS'?'LGS_EXAM_DATE':'YKS_EXAM_DATE';
+    const q=await sb.from('app_settings').select('value').eq('key',key).maybeSingle();
+    if(q.error) return null;
+    return q.data?.value||null;
+  }catch(_){ return null; }
+}
+window.generateAIPlan=async function(){
+  const status=document.getElementById('aiStatus');
+  const setStatus=(html)=>{if(status)status.innerHTML=html;};
+  try{
+    const sid=document.getElementById('aiStudent')?.value || document.getElementById('scheduleStudent')?.value;
+    if(!sid)throw new Error('Öğrenci seçilemedi.');
+    if(!canManagePlans())throw new Error('Programı yalnızca yönetici veya koç oluşturabilir.');
+    const week=aiTargetWeek||scheduleTargetWeek()||mondayISO();
+    const prev=addDaysISO(week,-7);
+    const file=document.getElementById('aiPhoto')?.files?.[0]||null;
+    setStatus('<b>Durum:</b> Program hazırlanıyor…');
+
+    let image=file?await saveStoredTimetable(sid,file):await getStoredTimetableDataURL(sid);
+    if(!image)throw new Error('Bu öğrenci için kayıtlı okul ders programı yok. Bir kez ders programı fotoğrafını seçip tekrar deneyin.');
+
+    const results=await Promise.all([
+      sb.from('students').select('*').eq('id',sid).single(),
+      sb.from('study_tasks').select('task_date,subject,topic,description,target_questions,status').eq('student_id',sid).gte('task_date',prev).lt('task_date',week),
+      sb.from('written_exams').select('subject,exam_date').eq('student_id',sid).gte('exam_date',new Date().toISOString().slice(0,10)).order('exam_date').limit(20),
+      sb.from('mock_exams').select('exam_date,exam_type,exam_name,total_correct,total_wrong,total_blank,total_net').eq('student_id',sid).order('exam_date',{ascending:false}).limit(10)
+    ]);
+    const studentResult=results[0];
+    if(studentResult.error)throw studentResult.error;
+    const st=studentResult.data;
+    const mainExamDate=await getMainExamDateForProgram(st.program_type);
+    let data={...st,target_week_start:week,previous_week_tasks:results[1].data||[],written_exams:results[2].data||[],mock_exams:results[3].data||[],main_exam_date:mainExamDate};
+    data.allowed_topics=await getCatalogForStudent(data);
+    data.topic_progress=await getProgressForAI(sid);
+
+    const res=await fetch('https://ozel-ders-evreni-ai.mrylmz0636.workers.dev/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:data,image})});
+    const result=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error(result.error||'Program oluşturma servisine ulaşılamadı.');
+    if(!Array.isArray(result.tasks)||!result.tasks.length)throw new Error('Program görev listesi üretilemedi.');
+
+    let planQuery=await sb.from('study_plans').select('id,status').eq('student_id',sid).eq('week_start',week).maybeSingle();
+    if(planQuery.error)throw planQuery.error;
+    let plan=planQuery.data;
+    if(plan?.status==='published')throw new Error('Bu hafta zaten öğrenciye yayınlanmış. Yeniden oluşturmak için önce mevcut haftalık programı silin.');
+    if(plan){
+      const del=await sb.from('study_tasks').delete().eq('plan_id',plan.id);if(del.error)throw del.error;
+      const up=await sb.from('study_plans').update({coach_id:st.coach_id,status:'draft',updated_at:new Date().toISOString()}).eq('id',plan.id);if(up.error)throw up.error;
+    }else{
+      const insPlan=await sb.from('study_plans').insert({student_id:sid,coach_id:st.coach_id,week_start:week,status:'draft'}).select('id,status').single();
+      if(insPlan.error)throw insPlan.error;plan=insPlan.data;
+    }
+    const tasks=validateAITasks(result.tasks,st,week,plan.id);
+    if(!tasks.length)throw new Error('Oluşturulan program kurallara uygun görev üretmedi.');
+    const ins=await sb.from('study_tasks').insert(tasks);if(ins.error)throw ins.error;
+    setStatus('<b>Durum:</b> Taslak program oluşturuldu ✓');
+    closeModal('aiPlanModal');aiTargetWeek=null;
+    const photo=document.getElementById('aiPhoto');if(photo)photo.value='';
+    await refreshPlanCount();await loadScheduleForStudent();
+    alert((st.full_name||'Öğrenci')+' için '+trDateFinal(week)+' haftası programı taslak olarak oluşturuldu. Kontrol edip Yayınla butonuna basın.');
+  }catch(e){
+    setStatus('<b>Durum:</b> Program oluşturma işlemi tamamlanamadı');
+    document.getElementById('authOverlay')?.classList.add('hidden');
+    alert('Program oluşturulamadı: '+(e?.message||e));
+  }
+};
+document.addEventListener('DOMContentLoaded',function(){
+  document.querySelectorAll('#v181Build').forEach(x=>x.remove());
+  const x=document.getElementById('syncState');
+  if(x&&!document.getElementById('v182Build'))x.insertAdjacentHTML('beforeend',' <span id="v182Build" style="opacity:.55">• V18.2</span>');
+});
+</script>
 </body></html>`);w.document.close();w.print()}
 
 (function(){
@@ -660,6 +738,84 @@ window.__APP_BUILD='V18.1';
 document.addEventListener('DOMContentLoaded',function(){
   var x=document.getElementById('syncState');
   if(x && !document.getElementById('v181Build')) x.insertAdjacentHTML('beforeend',' <span id="v181Build" style="opacity:.55">• V18.1</span>');
+});
+</script>
+
+<script id="v182-definitive-program-fix">
+// V18.2 — definitive weekly program generator. This final override deliberately
+// does not depend on the legacy examDatesCache variable or earlier generator wrappers.
+window.__APP_BUILD='V18.2';
+async function getMainExamDateForProgram(programType){
+  try{
+    const key=programType==='LGS'?'LGS_EXAM_DATE':'YKS_EXAM_DATE';
+    const q=await sb.from('app_settings').select('value').eq('key',key).maybeSingle();
+    if(q.error) return null;
+    return q.data?.value||null;
+  }catch(_){ return null; }
+}
+window.generateAIPlan=async function(){
+  const status=document.getElementById('aiStatus');
+  const setStatus=(html)=>{if(status)status.innerHTML=html;};
+  try{
+    const sid=document.getElementById('aiStudent')?.value || document.getElementById('scheduleStudent')?.value;
+    if(!sid)throw new Error('Öğrenci seçilemedi.');
+    if(!canManagePlans())throw new Error('Programı yalnızca yönetici veya koç oluşturabilir.');
+    const week=aiTargetWeek||scheduleTargetWeek()||mondayISO();
+    const prev=addDaysISO(week,-7);
+    const file=document.getElementById('aiPhoto')?.files?.[0]||null;
+    setStatus('<b>Durum:</b> Program hazırlanıyor…');
+
+    let image=file?await saveStoredTimetable(sid,file):await getStoredTimetableDataURL(sid);
+    if(!image)throw new Error('Bu öğrenci için kayıtlı okul ders programı yok. Bir kez ders programı fotoğrafını seçip tekrar deneyin.');
+
+    const results=await Promise.all([
+      sb.from('students').select('*').eq('id',sid).single(),
+      sb.from('study_tasks').select('task_date,subject,topic,description,target_questions,status').eq('student_id',sid).gte('task_date',prev).lt('task_date',week),
+      sb.from('written_exams').select('subject,exam_date').eq('student_id',sid).gte('exam_date',new Date().toISOString().slice(0,10)).order('exam_date').limit(20),
+      sb.from('mock_exams').select('exam_date,exam_type,exam_name,total_correct,total_wrong,total_blank,total_net').eq('student_id',sid).order('exam_date',{ascending:false}).limit(10)
+    ]);
+    const studentResult=results[0];
+    if(studentResult.error)throw studentResult.error;
+    const st=studentResult.data;
+    const mainExamDate=await getMainExamDateForProgram(st.program_type);
+    let data={...st,target_week_start:week,previous_week_tasks:results[1].data||[],written_exams:results[2].data||[],mock_exams:results[3].data||[],main_exam_date:mainExamDate};
+    data.allowed_topics=await getCatalogForStudent(data);
+    data.topic_progress=await getProgressForAI(sid);
+
+    const res=await fetch('https://ozel-ders-evreni-ai.mrylmz0636.workers.dev/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:data,image})});
+    const result=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error(result.error||'Program oluşturma servisine ulaşılamadı.');
+    if(!Array.isArray(result.tasks)||!result.tasks.length)throw new Error('Program görev listesi üretilemedi.');
+
+    let planQuery=await sb.from('study_plans').select('id,status').eq('student_id',sid).eq('week_start',week).maybeSingle();
+    if(planQuery.error)throw planQuery.error;
+    let plan=planQuery.data;
+    if(plan?.status==='published')throw new Error('Bu hafta zaten öğrenciye yayınlanmış. Yeniden oluşturmak için önce mevcut haftalık programı silin.');
+    if(plan){
+      const del=await sb.from('study_tasks').delete().eq('plan_id',plan.id);if(del.error)throw del.error;
+      const up=await sb.from('study_plans').update({coach_id:st.coach_id,status:'draft',updated_at:new Date().toISOString()}).eq('id',plan.id);if(up.error)throw up.error;
+    }else{
+      const insPlan=await sb.from('study_plans').insert({student_id:sid,coach_id:st.coach_id,week_start:week,status:'draft'}).select('id,status').single();
+      if(insPlan.error)throw insPlan.error;plan=insPlan.data;
+    }
+    const tasks=validateAITasks(result.tasks,st,week,plan.id);
+    if(!tasks.length)throw new Error('Oluşturulan program kurallara uygun görev üretmedi.');
+    const ins=await sb.from('study_tasks').insert(tasks);if(ins.error)throw ins.error;
+    setStatus('<b>Durum:</b> Taslak program oluşturuldu ✓');
+    closeModal('aiPlanModal');aiTargetWeek=null;
+    const photo=document.getElementById('aiPhoto');if(photo)photo.value='';
+    await refreshPlanCount();await loadScheduleForStudent();
+    alert((st.full_name||'Öğrenci')+' için '+trDateFinal(week)+' haftası programı taslak olarak oluşturuldu. Kontrol edip Yayınla butonuna basın.');
+  }catch(e){
+    setStatus('<b>Durum:</b> Program oluşturma işlemi tamamlanamadı');
+    document.getElementById('authOverlay')?.classList.add('hidden');
+    alert('Program oluşturulamadı: '+(e?.message||e));
+  }
+};
+document.addEventListener('DOMContentLoaded',function(){
+  document.querySelectorAll('#v181Build').forEach(x=>x.remove());
+  const x=document.getElementById('syncState');
+  if(x&&!document.getElementById('v182Build'))x.insertAdjacentHTML('beforeend',' <span id="v182Build" style="opacity:.55">• V18.2</span>');
 });
 </script>
 </body></html>
