@@ -191,6 +191,9 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;background:#f4f7fb}html
 
 </style></head><body><h1>ÖZEL DERS EVRENİ EĞİTİM KOÇLUĞU</h1>${c}
 
+
+
+
 </body></html>`);w.document.close();w.print()}
 
 (function(){
@@ -438,7 +441,8 @@ async function copyStudentInvite(){
 window.addEventListener('error',function(e){try{if(typeof currentProfile!=='undefined'&&currentProfile){var a=document.getElementById('authOverlay');if(a)a.classList.add('hidden');console.error('Uygulama hatası:',e.error||e.message||e);return;}var st=document.getElementById('authStatus');if(st)st.textContent='Uygulama başlatılamadı. Sayfayı yenileyin.';}catch(_){}});
 window.addEventListener('unhandledrejection',function(){var st=document.getElementById('authStatus');if(st&&document.getElementById('authOverlay')&&!currentProfile){document.getElementById('authOverlay').classList.remove('hidden');st.textContent='Bağlantı kurulamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.';}});
 </script>
-\n<script>
+
+<script>
 async function snapshotPlanVersion(planId,reason){
  try{
   const pr=await sb.from('study_plans').select('*').eq('id',planId).single(); if(pr.error) throw pr.error;
@@ -791,6 +795,73 @@ openInfo=async function(id){
 // Close only the information overlay; Student Management Center remains underneath.
 closeInfo=function(){document.getElementById('infoModal')?.classList.remove('show')};
 document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('#v184Build,#v185Build').forEach(x=>x.remove());const x=document.getElementById('syncState');if(x)x.insertAdjacentHTML('beforeend',' <span id="v185Build" style="opacity:.55">• V18.5.3</span>');v185RefreshNew()});
+</script>
+
+
+<script id="v1854InfoFix">
+// V18.5.4 - single-source Student Information entry points.
+// Both the dashboard button and Student Management Center call the same ID-based function.
+window.openInfo = async function(studentId){
+  const modal=document.getElementById('infoModal');
+  if(!modal){alert('Öğrenci Bilgileri penceresi bulunamadı.');return false;}
+  if(!studentId){alert('Öğrenci seçilemedi.');return false;}
+  window.activeStudentId=studentId;
+  modal.style.zIndex='1000';
+  modal.classList.add('show');
+  try{
+    const r=await sb.from('students').select('target,daily_minutes,strong_subjects,weak_subjects,excluded_subjects,coach_notes,school_status,student_phone,parent_name,parent_phone,coach_id,program_type,exam_stage,field,grade').eq('id',studentId).single();
+    if(r.error)throw r.error;
+    const d=r.data||{};
+    const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val??''};
+    set('infoGoal',d.target||'');
+    set('infoHours',d.daily_minutes==null?'':Number(d.daily_minutes)/60);
+    set('infoNote',d.coach_notes||'');
+    set('infoSchoolStatus',d.school_status||'school');
+    set('infoStudentPhone',d.student_phone||'');
+    set('infoParentName',d.parent_name||'');
+    set('infoParentPhone',d.parent_phone||'');
+    let subjects=V185_FALLBACK_SUBJECTS.slice();
+    try{const found=await v185Subjects(d);if(found&&found.length)subjects=found}catch(_){}
+    v185Render('infoStrongChecks',subjects,d.strong_subjects);
+    v185Render('infoWeakChecks',subjects,d.weak_subjects);
+    v185Render('infoExcludedChecks',subjects,d.excluded_subjects);
+    const wrap=document.getElementById('infoCoachWrap'),sel=document.getElementById('infoCoach');
+    if(wrap&&sel){
+      const isAdmin=currentProfile?.role==='admin';wrap.style.display=isAdmin?'flex':'none';
+      if(isAdmin){
+        const tr=await sb.from('profiles').select('id,full_name,status').eq('role','coach').in('status',['active','disabled']).order('full_name',{ascending:true});
+        if(tr.error)throw tr.error;
+        sel.innerHTML='<option value="">Atanmamış</option>'+(tr.data||[]).map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.full_name||'Öğretmen')}${t.status==='disabled'?' (Pasif)':''}</option>`).join('');
+        sel.value=d.coach_id||'';
+      }
+    }
+    return true;
+  }catch(e){
+    console.error('V18.5.4 openInfo',e);
+    // Keep the modal visible so failures never look like a dead/closing button.
+    alert('Öğrenci bilgileri yüklenemedi: '+(e?.message||e));
+    return false;
+  }
+};
+window.editInfo=function(btn){
+  const row=btn?.closest?.('tr');
+  const id=row?.dataset?.id;
+  return window.openInfo(id);
+};
+const v1854PreviousCenterAction=window.centerAction;
+window.centerAction=async function(type){
+  if(type==='info'){
+    const id=window.centerStudentId||window.activeCenterStudentId;
+    return window.openInfo(id);
+  }
+  return v1854PreviousCenterAction(type);
+};
+window.closeInfo=function(){document.getElementById('infoModal')?.classList.remove('show')};
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('#v184Build,#v185Build,#v1854Build').forEach(x=>x.remove());
+  const x=document.getElementById('syncState');
+  if(x)x.insertAdjacentHTML('beforeend',' <span id="v1854Build" style="opacity:.55">• V18.5.4</span>');
+});
 </script>
 
 </body></html>
