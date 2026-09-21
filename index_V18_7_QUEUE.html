@@ -694,64 +694,56 @@ window.generateAIPlan=async function(){
     if(prog.error) throw prog.error;
     data.topic_progress=prog.data||[];
 
-    // Queue V1: aynı öğrenci/hafta için tamamlanmış veya bekleyen işi yeniden kullan.
+    // V18.7 Queue: aynı öğrenci/hafta için mevcut işi devam ettir; yoksa yeni işi sıraya al.
+    const workerBase='https://ozel-ders-evreni-ai.mrylmz0636.workers.dev';
     const {data:sessionData}=await sb.auth.getSession();
     const accessToken=sessionData?.session?.access_token;
-    if(!accessToken)throw new Error('Oturum doğrulanamadı. Lütfen tekrar giriş yapın.');
+    if(!accessToken)throw new Error('Oturum süresi dolmuş. Lütfen tekrar giriş yapın.');
 
     let job=null;
-    const oldJobs=await sb.from('program_jobs')
-      .select('id,status,result_data,error_message,created_at')
-      .eq('student_id',sid)
-      .eq('week_start',week)
+    const existingJob=await sb.from('program_jobs')
+      .select('id,status,result_data,error_message,created_at,updated_at')
+      .eq('student_id',sid).eq('week_start',week)
       .eq('requested_by',sessionData.session.user.id)
       .in('status',['queued','processing','completed'])
-      .order('created_at',{ascending:false})
-      .limit(1);
-    if(oldJobs.error)throw oldJobs.error;
-    job=(oldJobs.data||[])[0]||null;
+      .order('created_at',{ascending:false}).limit(1).maybeSingle();
+    if(existingJob.error)throw existingJob.error;
+    job=existingJob.data||null;
 
     if(!job){
       setStatus('<b>Durum:</b> Program oluşturma isteği sıraya alınıyor…');
-      const enqueueRes=await fetch('https://ozel-ders-evreni-ai.mrylmz0636.workers.dev/enqueue',{
+      const enqueueRes=await fetch(workerBase+'/enqueue',{
         method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'Authorization':'Bearer '+accessToken
-        },
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},
         body:JSON.stringify({student:data,image,week_start:week})
       });
-      const enqueue=await enqueueRes.json().catch(()=>({}));
-      if(!enqueueRes.ok)throw new Error(enqueue.error||'Program oluşturma kuyruğuna ulaşılamadı.');
-      if(!enqueue.job_id)throw new Error('Program işi oluşturulamadı.');
-      job={id:enqueue.job_id,status:'queued'};
+      const enqueueOut=await enqueueRes.json().catch(()=>({}));
+      if(!enqueueRes.ok)throw new Error(enqueueOut.error||'Program oluşturma kuyruğuna ulaşılamadı.');
+      job={id:enqueueOut.job_id,status:enqueueOut.status||'queued'};
     }
 
-    let result=job.result_data||null;
-    if(job.status!=='completed'){
-      setStatus('<b>Durum:</b> Program sırada bekliyor… Bu pencere açıkken sonuç otomatik kontrol edilecek.');
-      const started=Date.now();
-      const maxWait=10*60*1000;
-      while(Date.now()-started<maxWait){
+    let result=null;
+    if(job.status==='completed'&&Array.isArray(job.result_data?.tasks)){
+      result=job.result_data;
+    }else{
+      setStatus('<b>Durum:</b> Program sırada bekliyor… Sonuç otomatik kontrol ediliyor.');
+      const started=Date.now(),maxForegroundWait=10*60*1000;
+      while(Date.now()-started<maxForegroundWait){
         await new Promise(r=>setTimeout(r,5000));
-        const jr=await fetch('https://ozel-ders-evreni-ai.mrylmz0636.workers.dev/job/'+encodeURIComponent(job.id),{
-          method:'GET',
+        const jr=await fetch(workerBase+'/job/'+encodeURIComponent(job.id),{
           headers:{'Authorization':'Bearer '+accessToken}
         });
-        const j=await jr.json().catch(()=>({}));
-        if(!jr.ok)throw new Error(j.error||'Program işi kontrol edilemedi.');
-        if(j.status==='completed'){
-          result=j.result_data;
-          break;
-        }
-        if(j.status==='failed')throw new Error(j.error_message||'Program oluşturma işi başarısız oldu.');
-        setStatus('<b>Durum:</b> '+(j.status==='processing'?'Program hazırlanıyor…':'Program sırada bekliyor…'));
+        const jo=await jr.json().catch(()=>({}));
+        if(!jr.ok)throw new Error(jo.error||'Program işi okunamadı.');
+        if(jo.status==='completed'){result=jo.result_data;break;}
+        if(jo.status==='failed')throw new Error(jo.error_message||'Program oluşturma işi başarısız oldu.');
+        setStatus('<b>Durum:</b> Program hazırlanıyor… Kuyruk durumu: '+(jo.status==='processing'?'işleniyor':'bekliyor'));
       }
     }
 
     if(!result){
-      setStatus('<b>Durum:</b> Program sırada. OpenAI limiti açıldığında otomatik işlenecek.');
-      alert('Program isteği sıraya alındı. Şu anda sonuç hazır değil. Daha sonra aynı öğrenci ve hafta için Programı Hazırla dediğinizde tamamlanan sonuç otomatik alınacak.');
+      setStatus('<b>Durum:</b> İstek kuyrukta bekliyor ✓');
+      alert('Program isteği güvenli şekilde kuyruğa alındı. Sonuç daha sonra hazır olabilir. Aynı öğrenci ve hafta için Programı Hazırla butonuna tekrar bastığınızda mevcut iş kontrol edilecek; yeni kopya oluşturulmayacak.');
       return;
     }
     if(!Array.isArray(result.tasks)||!result.tasks.length)throw new Error('Program görev listesi üretilemedi.');
