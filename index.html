@@ -799,7 +799,7 @@ document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('#v1
 
 
 <script id="v1854InfoFix">
-// V18.5.5 - single-source Student Information entry points.
+// V18.5.6 - single-source Student Information entry points.
 // Both the dashboard button and Student Management Center call the same ID-based function.
 window.openInfo = async function(studentId){
   const modal=document.getElementById('infoModal');
@@ -837,7 +837,7 @@ window.openInfo = async function(studentId){
     }
     return true;
   }catch(e){
-    console.error('V18.5.5 openInfo',e);
+    console.error('V18.5.6 openInfo',e);
     // Keep the modal visible so failures never look like a dead/closing button.
     alert('Öğrenci bilgileri yüklenemedi: '+(e?.message||e));
     return false;
@@ -860,13 +860,13 @@ window.closeInfo=function(){document.getElementById('infoModal')?.classList.remo
 document.addEventListener('DOMContentLoaded',()=>{
   document.querySelectorAll('#v184Build,#v185Build,#v1854Build').forEach(x=>x.remove());
   const x=document.getElementById('syncState');
-  if(x)x.insertAdjacentHTML('beforeend',' <span id="v1854Build" style="opacity:.55">• V18.5.5</span>');
+  if(x)x.insertAdjacentHTML('beforeend',' <span id="v1854Build" style="opacity:.55">• V18.5.6</span>');
 });
 </script>
 
 </body></html>
 <script id="v1855InfoDefinitiveFix">
-// V18.5.5 - self-contained Student Information flow.
+// V18.5.6 - self-contained Student Information flow.
 // No dependency on V18.5 subject catalog helpers or legacy table-cell state.
 (function(){
   const SUBJECTS=['Türkçe','Matematik','Geometri','Tarih','Coğrafya','Felsefe','Din Kültürü','Fizik','Kimya','Biyoloji','Edebiyat','İngilizce'];
@@ -898,7 +898,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         const {data:teachers,error:te}=await sb.from('profiles').select('id,full_name,status').eq('role','coach').in('status',['active','disabled']).order('full_name');
         if(te)throw te; sel.innerHTML='<option value="">Atanmamış</option>'+(teachers||[]).map(t=>`<option value="${t.id}">${escapeHtml(t.full_name||'Öğretmen')}${t.status==='disabled'?' (Pasif)':''}</option>`).join('');sel.value=d?.coach_id||'';
       }}
-    }catch(e){console.error('V18.5.5 openInfo',e);alert('Öğrenci bilgileri yüklenemedi: '+(e?.message||e));}
+    }catch(e){console.error('V18.5.6 openInfo',e);alert('Öğrenci bilgileri yüklenemedi: '+(e?.message||e));}
   };
   window.editInfo=function(btn){const id=btn?.closest?.('tr')?.dataset?.id;if(!id)return alert('Öğrenci seçilemedi.');return window.openInfo(id)};
   const previousCenter=window.centerAction;
@@ -927,6 +927,58 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.getElementById('infoModal').classList.remove('show');await loadCloudStudents();
   };
   window.closeInfo=function(){document.getElementById('infoModal')?.classList.remove('show')};
-  document.addEventListener('DOMContentLoaded',()=>{const x=document.getElementById('syncState');if(x){x.querySelectorAll('[id$="Build"]').forEach(e=>e.remove());x.insertAdjacentHTML('beforeend',' <span id="v1855Build" style="opacity:.55">• V18.5.5</span>')}});
+  document.addEventListener('DOMContentLoaded',()=>{const x=document.getElementById('syncState');if(x){x.querySelectorAll('[id$="Build"]').forEach(e=>e.remove());x.insertAdjacentHTML('beforeend',' <span id="v1855Build" style="opacity:.55">• V18.5.6</span>')}});
+})();
+</script>
+
+<script id="v1856InfoSaveDefinitiveFix">
+(function(){
+  const val=id=>document.getElementById(id);
+  const picked=id=>[...document.querySelectorAll('#'+id+' input[type="checkbox"]:checked')].map(x=>x.value);
+  async function saveInfoV1856(){
+    const btn=document.querySelector('#infoModal .modalactions button.green');
+    const id=window.activeStudentId || null;
+    if(!id){ alert('Öğrenci seçilemedi. Bilgiler ekranını kapatıp tekrar açın.'); return; }
+    const hoursRaw=val('infoHours')?.value ?? '';
+    const hours=hoursRaw===''?null:Number(hoursRaw);
+    if(hours!==null && (!Number.isFinite(hours)||hours<0)){alert('Günlük çalışma süresini kontrol edin.');return;}
+    const strong=picked('infoStrongChecks'), weak=picked('infoWeakChecks'), excluded=picked('infoExcludedChecks');
+    const overlap=strong.filter(x=>weak.includes(x));
+    if(overlap.length){alert('Aynı ders hem Güçlü Dersler hem Eksik Dersler içinde seçilemez: '+overlap.join(', '));return;}
+    const payload={
+      target:val('infoGoal')?.value.trim()||null,
+      daily_minutes:hours===null?null:Math.round(hours*60),
+      strong_subjects:strong.join(', ')||null,
+      weak_subjects:weak.join(', ')||null,
+      excluded_subjects:excluded,
+      coach_notes:val('infoNote')?.value.trim()||null,
+      school_status:val('infoSchoolStatus')?.value||'school',
+      student_phone:val('infoStudentPhone')?.value.trim()||null,
+      parent_name:val('infoParentName')?.value.trim()||null,
+      parent_phone:val('infoParentPhone')?.value.trim()||null,
+      updated_at:new Date().toISOString()
+    };
+    if(window.currentProfile?.role==='admin' || (typeof currentProfile!=='undefined' && currentProfile?.role==='admin')) payload.coach_id=val('infoCoach')?.value||null;
+    try{
+      if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+      const r=await sb.from('students').update(payload).eq('id',id).select('id,excluded_subjects').single();
+      if(r.error) throw r.error;
+      alert('Öğrenci bilgileri kaydedildi.');
+      document.getElementById('infoModal')?.classList.remove('show');
+      if(typeof loadCloudStudents==='function') await loadCloudStudents();
+    }catch(e){
+      console.error('V18.5.6 saveInfo',e);
+      alert('Bilgiler kaydedilemedi: '+(e?.message||String(e)));
+    }finally{if(btn){btn.disabled=false;btn.textContent='Kaydet';}}
+  }
+  window.saveInfo=saveInfoV1856;
+  function wire(){
+    const btn=document.querySelector('#infoModal .modalactions button.green');
+    if(btn){btn.onclick=saveInfoV1856;}
+    const strong=document.getElementById('infoStrongChecks'), weak=document.getElementById('infoWeakChecks');
+    const exclusive=(from,to)=>from?.addEventListener('change',e=>{if(e.target.matches('input[type=checkbox]')&&e.target.checked){[...to.querySelectorAll('input[type=checkbox]')].find(x=>x.value===e.target.value)?.click();}});
+    exclusive(strong,weak);exclusive(weak,strong);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wire);else wire();
 })();
 </script>
