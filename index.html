@@ -564,4 +564,11 @@ async function openTeacherDetail(id){
  const pr=await sb.from('profiles').select('id,full_name,email,status').eq('id',id).single();if(pr.error)return alert('Öğretmen bilgisi alınamadı: '+pr.error.message);teacherDetailName.textContent='👨‍🏫 '+(pr.data.full_name||'Öğretmen');teacherDetailMeta.textContent=(pr.data.email||'')+' • '+(pr.data.status==='active'?'Aktif':'Pasif');teacherDetailStudents.innerHTML='Yükleniyor…';document.getElementById('teacherDetailModal').classList.add('show');
  const st=await sb.from('students').select('id,full_name,grade,program_type,exam_stage,field,student_phone').eq('coach_id',id).order('full_name',{ascending:true});if(st.error){teacherDetailStudents.textContent='Öğrenciler alınamadı: '+st.error.message;return;}const a=st.data||[];teacherDetailStudents.innerHTML='<h3>Öğrencileri ('+a.length+')</h3>'+(a.length?'<table><thead><tr><th>Öğrenci</th><th>Sınıf</th><th>Program</th><th>Telefon</th></tr></thead><tbody>'+a.map(x=>`<tr><td><button class="studentNameLink" onclick="closeModal('teacherDetailModal');openStudentCenter('${x.id}')">${escapeHtml(x.full_name||'—')}</button></td><td>${escapeHtml(x.grade||'—')}</td><td>${escapeHtml(x.program_type==='YKS'?'YKS - '+(x.exam_stage||'TYT'):(x.program_type||'—'))}</td><td>${escapeHtml(x.student_phone||'—')}</td></tr>`).join('')+'</tbody></table>':'<div class="empty">Bu öğretmene bağlı öğrenci yok.</div>');
 }
+
+// V17.8.2 — ensure the final student/teacher grouping renderer runs after all patches are loaded.
+window.addEventListener('load',()=>{
+  setTimeout(()=>{
+    if(currentProfile?.role==='admin' && typeof loadCloudStudents==='function') loadCloudStudents();
+  },250);
+});
 </script></body></html>
