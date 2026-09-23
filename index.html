@@ -1393,6 +1393,185 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 })();
 </script>
 
+
+<script id="final194TaskEditorDefinitive">
+(function(){
+ const norm=s=>String(s||'').trim().toLocaleLowerCase('tr-TR');
+ const esc=s=>typeof escapeHtml==='function'?escapeHtml(String(s??'')):String(s??'');
+ const mins=v=>{const m=/^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(v||'').trim());return m?+m[1]*60 + +m[2]:null};
+
+ window.editDraftTask=async function(id){
+  if(!canManagePlans())return alert('Programı yalnızca yönetici veya koç düzenleyebilir.');
+  const tr=await sb.from('study_tasks').select('*').eq('id',id).single();
+  if(tr.error)return alert('Görev alınamadı: '+tr.error.message);
+  const t=tr.data; window.v185TaskEditId=id;
+
+  const sr=await sb.from('students').select('program_type,exam_stage,grade,field').eq('id',t.student_id).single();
+  if(sr.error)return alert('Öğrenci bilgisi alınamadı: '+sr.error.message);
+  const st=sr.data;
+
+  // Önce program türündeki TÜM dersleri al.
+  const cr=await sb.from('subject_topics')
+    .select('subject,topic,program_type,exam_stage,grade,sort_order')
+    .eq('program_type',st.program_type)
+    .order('subject').order('sort_order');
+  if(cr.error)return alert('Ders/konu listesi alınamadı: '+cr.error.message);
+  let catalog=cr.data||[];
+
+  if(st.program_type==='ARA'){
+    const g=catalog.filter(x=>String(x.grade||'')===String(st.grade||''));
+    if(g.length)catalog=g;
+  }
+  if(st.program_type==='YKS'){
+    const stage=String(st.exam_stage||'TYT').toUpperCase().replace('YKS - ','').replace('YKS ','').trim();
+    const g=catalog.filter(x=>String(x.exam_stage||'').toUpperCase()===stage);
+    // Tek derslik/eksik katalog varsa tüm YKS derslerini koru.
+    if(new Set(g.map(x=>x.subject)).size>1)catalog=g;
+  }
+  if(st.program_type==='YKS'&&(norm(st.field).includes('eşit')||norm(st.field)==='ea')){
+    catalog=catalog.filter(x=>!['fizik','kimya','biyoloji','fen'].some(b=>norm(x.subject).includes(b)));
+  }
+
+  window.v185TaskCatalog=catalog;
+  let subjects=[...new Set(catalog.map(x=>String(x.subject||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+  if(t.subject&&!subjects.includes(t.subject))subjects.unshift(t.subject);
+  teSubject.innerHTML=subjects.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  teSubject.value=subjects.includes(t.subject)?t.subject:(subjects[0]||'');
+  teSubject.onchange=()=>window.v185LoadTaskTopics('');
+  window.v185LoadTaskTopics(t.topic);
+  teStart.value=String(t.start_time||'18:00').slice(0,5);
+  teEnd.value=String(t.end_time||'19:00').slice(0,5);
+  teQuestions.value=t.target_questions??'';
+  document.getElementById('taskEditV185Modal').classList.add('show');
+ };
+
+ window.v185LoadTaskTopics=function(selected){
+  const subject=String(teSubject.value||'');
+  let topics=[...new Set((window.v185TaskCatalog||[]).filter(x=>String(x.subject||'')===subject).map(x=>String(x.topic||'').trim()).filter(Boolean))];
+  if(selected&&!topics.includes(selected))topics.unshift(selected);
+  teTopic.innerHTML=topics.length?topics.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(''):'<option value="">Bu ders için konu bulunamadı</option>';
+  if(selected&&topics.includes(selected))teTopic.value=selected;
+ };
+
+ window.v185SaveTaskEdit=async function(){
+  if(!window.v185TaskEditId)return alert('Düzenlenecek görev bulunamadı.');
+  const subject=String(teSubject.value||'').trim(),topic=String(teTopic.value||'').trim();
+  const start=String(teStart.value||'').trim(),end=String(teEnd.value||'').trim();
+  const questions=teQuestions.value===''?null:Number(teQuestions.value);
+  if(!subject)return alert('Ders seçmelisiniz.');
+  if(!topic)return alert('Konu / görev seçmelisiniz.');
+  const a=mins(start),b=mins(end);
+  if(a===null||b===null)return alert('Başlangıç ve bitiş saatini kontrol edin.');
+  if(b<=a)return alert('Bitiş saati başlangıç saatinden sonra olmalıdır.');
+  if(questions!==null&&(!Number.isFinite(questions)||questions<0))return alert('Soru hedefini kontrol edin.');
+
+  const btn=document.querySelector('#taskEditV185Modal .modalactions button.primary');
+  if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…'}
+  try{
+   const r=await sb.from('study_tasks').update({subject,topic,start_time:start,end_time:end,target_questions:questions}).eq('id',window.v185TaskEditId);
+   if(r.error)throw r.error;
+   closeModal('taskEditV185Modal');
+   await loadScheduleForStudent();
+  }catch(e){alert('Görev güncellenemedi: '+(e.message||e))}
+  finally{if(btn){btn.disabled=false;btn.textContent='Kaydet'}}
+ };
+})();
+</script>
+
+
+<script id="final195TaskCatalogCorrect">
+(function(){
+ const norm=s=>String(s||'').trim().toLocaleLowerCase('tr-TR');
+ const esc=s=>typeof escapeHtml==='function'?escapeHtml(String(s??'')):String(s??'');
+ const mins=v=>{const m=/^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(v||'').trim());return m?Number(m[1])*60+Number(m[2]):null};
+
+ function scopes(st){
+   const stage=String(st.exam_stage||'TYT').toUpperCase().replace('YKS - ','').replace('YKS ','').trim();
+   const f=norm(st.field);
+   if(st.program_type!=='YKS')return [];
+   if(stage==='TYT')return ['COMMON'];
+   if(stage==='YDT'||f.includes('dil'))return ['DIL'];
+   if(f.includes('say'))return ['SAY_EA','SAY'];
+   if(f.includes('eşit')||f==='ea')return ['SAY_EA','EA_SOZ'];
+   if(f.includes('söz'))return ['EA_SOZ','SOZ'];
+   return ['COMMON'];
+ }
+
+ async function catalogFor(st){
+   const stage=String(st.exam_stage||'TYT').toUpperCase().replace('YKS - ','').replace('YKS ','').trim();
+   let q=sb.from('subject_topics').select('id,subject,topic,program_type,exam_stage,field_scope,grade,sort_order')
+     .eq('program_type',st.program_type);
+   if(st.program_type==='YKS') q=q.eq('exam_stage',stage).in('field_scope',scopes(st));
+   else if(st.program_type==='LGS') q=q.eq('grade','8');
+   else q=q.eq('grade',String(st.grade||''));
+   const r=await q.order('subject').order('sort_order');
+   if(r.error)throw r.error;
+   return r.data||[];
+ }
+
+ window.editDraftTask=async function(id){
+   if(!canManagePlans())return alert('Programı yalnızca yönetici veya koç düzenleyebilir.');
+   const tr=await sb.from('study_tasks').select('*').eq('id',id).single();
+   if(tr.error)return alert('Görev alınamadı: '+tr.error.message);
+   const t=tr.data; window.v185TaskEditId=id;
+
+   const sr=await sb.from('students').select('program_type,exam_stage,grade,field').eq('id',t.student_id).single();
+   if(sr.error)return alert('Öğrenci bilgisi alınamadı: '+sr.error.message);
+   try{
+     window.v185TaskCatalog=await catalogFor(sr.data);
+   }catch(e){return alert('Ders/konu listesi alınamadı: '+(e.message||e))}
+
+   let subjects=[...new Set(v185TaskCatalog.map(x=>String(x.subject||'').trim()).filter(Boolean))]
+     .sort((a,b)=>a.localeCompare(b,'tr'));
+   if(t.subject&&!subjects.includes(t.subject))subjects.unshift(t.subject);
+
+   teSubject.innerHTML=subjects.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+   teSubject.value=subjects.includes(t.subject)?t.subject:(subjects[0]||'');
+   teSubject.onchange=()=>window.v185LoadTaskTopics('');
+   window.v185LoadTaskTopics(t.topic);
+
+   teStart.value=String(t.start_time||'18:00').slice(0,5);
+   teEnd.value=String(t.end_time||'19:00').slice(0,5);
+   teQuestions.value=t.target_questions??'';
+   document.getElementById('taskEditV185Modal').classList.add('show');
+ };
+
+ window.v185LoadTaskTopics=function(selected){
+   const subject=String(teSubject.value||'');
+   let topics=[...new Set((window.v185TaskCatalog||[])
+      .filter(x=>String(x.subject||'')===subject)
+      .map(x=>String(x.topic||'').trim()).filter(Boolean))];
+   if(selected&&!topics.includes(selected))topics.unshift(selected);
+   teTopic.innerHTML=topics.length
+     ?topics.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')
+     :'<option value="">Bu ders için konu bulunamadı</option>';
+   if(selected&&topics.includes(selected))teTopic.value=selected;
+ };
+
+ window.v185SaveTaskEdit=async function(){
+   if(!window.v185TaskEditId)return alert('Düzenlenecek görev bulunamadı.');
+   const subject=String(teSubject.value||'').trim(),topic=String(teTopic.value||'').trim();
+   const start=String(teStart.value||'').trim(),end=String(teEnd.value||'').trim();
+   const questions=teQuestions.value===''?null:Number(teQuestions.value);
+   if(!subject)return alert('Ders seçmelisiniz.');
+   if(!topic)return alert('Konu / görev seçmelisiniz.');
+   const a=mins(start),b=mins(end);
+   if(a===null||b===null)return alert('Başlangıç ve bitiş saatini kontrol edin.');
+   if(b<=a)return alert('Bitiş saati başlangıç saatinden sonra olmalıdır.');
+   if(questions!==null&&(!Number.isFinite(questions)||questions<0))return alert('Soru hedefini kontrol edin.');
+   const btn=document.querySelector('#taskEditV185Modal .modalactions button.primary');
+   if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…'}
+   try{
+     const r=await sb.from('study_tasks').update({subject,topic,start_time:start,end_time:end,target_questions:questions}).eq('id',window.v185TaskEditId);
+     if(r.error)throw r.error;
+     closeModal('taskEditV185Modal');
+     await loadScheduleForStudent();
+   }catch(e){alert('Görev güncellenemedi: '+(e.message||e))}
+   finally{if(btn){btn.disabled=false;btn.textContent='Kaydet'}}
+ };
+})();
+</script>
+
 </body></html>
 <script id="v1855InfoDefinitiveFix">
 // V18.5.6 - self-contained Student Information flow.
