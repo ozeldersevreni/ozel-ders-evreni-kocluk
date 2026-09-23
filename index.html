@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/><title>ÖZEL DERS EVRENİ EĞİTİM KOÇLUĞU • V17.8</title><style>
+<html lang="tr"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport"/><title>ÖZEL DERS EVRENİ EĞİTİM KOÇLUĞU • FINAL 19.0</title><style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f7fb;color:#17233c}.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}.side{background:#102b46;color:#fff;padding:24px 16px}.logo{font-size:18px;font-weight:800;margin-bottom:28px;text-align:center}.brandLogo{width:120px;height:120px;object-fit:contain;border-radius:18px;background:#fff;display:block;margin:0 auto 10px}.authBrandLogo{width:150px;height:150px;object-fit:contain;display:block;margin:0 auto 12px}.nav button{width:100%;text-align:left;border:0;background:transparent;color:#dce8f4;padding:12px;border-radius:10px;margin:4px 0;font-size:15px;cursor:pointer}.nav button.active,.nav button:hover{background:#1769e0;color:#fff}.main{padding:24px}.top{display:flex;justify-content:space-between;align-items:center}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:20px 0}.card,.panel{background:white;border-radius:16px;padding:18px;box-shadow:0 5px 18px #102b4612}.metric{font-size:30px;font-weight:800}.grid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}button.primary{background:#1769e0;color:white;border:0;padding:11px 16px;border-radius:10px;font-weight:700;cursor:pointer}.small{padding:7px 9px!important;font-size:12px}.info{font-size:12px;color:#5b677a;max-width:220px;white-space:pre-wrap}button.green{background:#10a85a;color:white;border:0;padding:11px 16px;border-radius:10px;font-weight:700;cursor:pointer}input,select,textarea{padding:10px;border:1px solid #d8e0ea;border-radius:9px}table{width:100%;border-collapse:collapse}th,td{padding:11px;border-bottom:1px solid #edf0f5;text-align:left;font-size:14px}.progress{height:9px;background:#e7ecf3;border-radius:9px;overflow:hidden}.progress i{display:block;height:100%;background:#10a85a}.student{display:none}.student.show,.coach.hide{display:none}.student.show{display:block}.task{display:grid;grid-template-columns:110px 1fr 120px;gap:12px;padding:14px 0;border-bottom:1px solid #eee}.tag{display:inline-block;background:#e7f0ff;color:#1769e0;padding:7px 10px;border-radius:8px}.done{color:#0b9d52;font-weight:700}.modal{display:none;position:fixed;inset:0;background:#102b4677;align-items:center;justify-content:center;padding:20px;z-index:20}.modal.show{display:flex}.modalbox{background:#fff;width:min(560px,100%);border-radius:18px;padding:22px;box-shadow:0 20px 60px #102b4640}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}.field label{font-size:13px;font-weight:700;color:#445269}.field textarea{min-height:90px;resize:vertical}.modalactions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}.secondary{background:#e9eef5;color:#25364d;border:0;padding:11px 16px;border-radius:10px;font-weight:700;cursor:pointer}.danger{background:#d9363e;color:white;border:0;padding:11px 16px;border-radius:10px;font-weight:700;cursor:pointer}@media(max-width:900px){.app{grid-template-columns:1fr}.side{display:none}.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.main{padding:14px}.task{grid-template-columns:1fr}}
 .authOverlay{position:fixed;inset:0;background:linear-gradient(135deg,#102b46,#1769e0);z-index:99;display:flex;align-items:center;justify-content:center;padding:20px}.authCard{background:#fff;width:min(430px,100%);padding:28px;border-radius:20px;box-shadow:0 25px 70px #0004}.authCard h1{margin-top:0}.authTabs{display:flex;gap:8px;margin:16px 0}.authTabs button{flex:1}.sync{font-size:12px;color:#5b677a;margin-top:8px}.hidden{display:none!important}
 .scheduleToolbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:10px 0 16px}.scheduleToolbar .field{margin:0;min-width:260px}.weekGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.dayCard{border:1px solid #dbe4ef;border-radius:14px;background:#f8fbff;overflow:hidden}.dayHead{padding:11px 13px;background:#edf4ff;font-weight:800;color:#102b46;display:flex;justify-content:space-between;gap:10px}.dayBody{padding:10px}.dayEmpty{color:#7a8797;padding:10px 2px;font-size:13px}.scheduleTask{background:#fff;border:1px solid #e2e8f0;border-radius:11px;padding:11px;margin-bottom:8px}.scheduleTask:last-child{margin-bottom:0}.scheduleTaskTop{display:flex;justify-content:space-between;gap:10px;align-items:center}.scheduleTime{font-weight:800;color:#1769e0}.scheduleSubject{font-size:12px;font-weight:800;background:#e8f1ff;color:#1257b8;padding:4px 8px;border-radius:999px}.scheduleTopic{font-weight:800;margin:7px 0 4px}.scheduleDesc{font-size:13px;color:#445064;line-height:1.35}.scheduleMeta{font-size:12px;color:#687589;margin-top:7px}.taskDoneBtn{margin-top:9px;border:0;border-radius:9px;padding:8px 11px;font-weight:800;cursor:pointer;background:#10a957;color:#fff}.taskDoneBtn.done{background:#e8f7ef;color:#147a43}.scheduleTask.completed{background:#f4fbf7;border-color:#bfe8d0}.scheduleWeekTitle{margin:4px 0 12px;color:#102b46}@media(max-width:760px){.weekGrid{grid-template-columns:1fr}.scheduleToolbar .field{min-width:100%;width:100%}}
@@ -638,7 +638,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <script id="v182-definitive-program-fix">
 // V18.2 — definitive weekly program generator. This final override deliberately
 // does not depend on the legacy examDatesCache variable or earlier generator wrappers.
-window.__APP_BUILD='V18.4';
+window.__APP_BUILD='V18.7-QUEUE';
 async function getMainExamDateForProgram(programType){
   try{
     const key=programType==='LGS'?'LGS_EXAM_DATE':'YKS_EXAM_DATE';
@@ -694,9 +694,38 @@ window.generateAIPlan=async function(){
     if(prog.error) throw prog.error;
     data.topic_progress=prog.data||[];
 
-    const res=await fetch('https://ozel-ders-evreni-ai.mrylmz0636.workers.dev/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student:data,image})});
-    const result=await res.json().catch(()=>({}));
-    if(!res.ok)throw new Error(result.error||'Program oluşturma servisine ulaşılamadı.');
+    const {data:sessionData,error:sessionError}=await sb.auth.getSession();
+    if(sessionError)throw sessionError;
+    const accessToken=sessionData?.session?.access_token;
+    if(!accessToken)throw new Error('Oturum bulunamadı. Lütfen yeniden giriş yapın.');
+    const workerBase='https://ozel-ders-evreni-ai.mrylmz0636.workers.dev';
+
+    status.innerHTML='<b>Durum:</b> Program oluşturma kuyruğuna ekleniyor…';
+    const enqueueRes=await fetch(workerBase+'/enqueue',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify({student:data,image,week_start:week})});
+    const enqueueOut=await enqueueRes.json().catch(()=>({}));
+    if(!enqueueRes.ok)throw new Error(enqueueOut.error||'Program oluşturma kuyruğuna ulaşılamadı.');
+    const jobId=enqueueOut.job_id||enqueueOut.id;
+    if(!jobId)throw new Error('Program işi oluşturulamadı.');
+
+    status.innerHTML='<b>Durum:</b> Program sıraya alındı, hazırlanıyor…';
+    let job=null;
+    const pollStarted=Date.now();
+    while(Date.now()-pollStarted<90000){
+      await new Promise(resolve=>setTimeout(resolve,5000));
+      const jobRes=await fetch(workerBase+'/job/'+encodeURIComponent(jobId),{headers:{'Authorization':'Bearer '+accessToken}});
+      const jobOut=await jobRes.json().catch(()=>({}));
+      if(!jobRes.ok)throw new Error(jobOut.error||'Program durumu alınamadı.');
+      job=jobOut.job||jobOut;
+      if(job?.status==='completed')break;
+      if(job?.status==='failed')throw new Error(job.error_message||'Program oluşturma işlemi başarısız oldu.');
+      status.innerHTML='<b>Durum:</b> Program sırada / hazırlanıyor…';
+    }
+    if(!job||job.status!=='completed'){
+      status.innerHTML='<b>Durum:</b> Program sıraya alındı ✓';
+      alert('Program sıraya alındı. Sunucu yoğunluğu nedeniyle hazırlanması zaman alabilir. Daha sonra Haftalık Program ekranından tekrar kontrol edebilirsiniz.');
+      return;
+    }
+    const result=job.result_data||{};
     if(!Array.isArray(result.tasks)||!result.tasks.length)throw new Error('Program görev listesi üretilemedi.');
 
     let planQuery=await sb.from('study_plans').select('id,status').eq('student_id',sid).eq('week_start',week).maybeSingle();
@@ -864,10 +893,239 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
+
+<style id="final190Styles">
+/* Gerçek öğrenci hesabında koç/yönetici işlemleri görünmez. */
+body.realStudentRole #backCoachBtn,
+body.realStudentRole #student .studentSection button[onclick="openStudentTopicEntry()"],
+body.realStudentRole #student .studentSection button[onclick="openStudentMockEntry()"]{display:none!important}
+
+/* Öğretmen görünümünde admin-only kontroller gizlenir. */
+body.teacherPreviewMode button[onclick="openApplications()"],
+body.teacherPreviewMode button[onclick="openUpdate()"],
+body.teacherPreviewMode #approvedTeachersPanel,
+body.coachRole #approvedTeachersPanel{display:none!important}
+
+#teacherPreviewBanner{display:none;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#eef6ff;border:1px solid #bfdbfe}
+body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.teacherDateGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+@media(max-width:700px){.teacherDateGrid{grid-template-columns:1fr}}
+</style>
+
+<script id="final190Patch">
+(function(){
+  window.adminTeacherPreviewId=null;
+  window.adminTeacherPreviewName='';
+
+  function esc(v){return typeof escapeHtml==='function'?escapeHtml(String(v??'')):String(v??'')}
+
+  // Öğrenci rolünde yalnız görüntüleme: yazılı tarihi girişi korunur,
+  // çalışma ve deneme ekleme koç/yöneticiye aittir.
+  function enforceRoleUI(){
+    const role=String(window.currentProfile?.role||'');
+    document.body.classList.toggle('realStudentRole',role==='student');
+    if(role==='student'){
+      document.getElementById('backCoachBtn')?.style.setProperty('display','none','important');
+    }
+  }
+
+  // Mobil sol menü: admin/koç yanlışlıkla öğrenci görünümünde kalmasın.
+  document.addEventListener('click',function(e){
+    const btn=e.target?.closest?.('#appSidebar .nav button,.side .nav button');
+    if(!btn || currentProfile?.role==='student')return;
+    document.getElementById('student')?.classList.remove('show');
+    document.getElementById('coach')?.classList.remove('hide');
+  },true);
+
+  // Öğretmen sadece kendi öğrencilerini görür.
+  // Admin öğretmen önizlemesinde seçilen öğretmenin öğrencileri gösterilir.
+  const oldLoadCloudStudents=window.loadCloudStudents;
+  window.loadCloudStudents=async function(){
+    if(!window.currentProfile)return oldLoadCloudStudents?.();
+    syncState.textContent='☁️ Öğrenciler Supabase’den yükleniyor…';
+    let q=sb.from('students')
+      .select('id,student_user_id,coach_id,full_name,grade,program_type,exam_stage,field,target,daily_minutes,strong_subjects,weak_subjects,coach_notes,school_status')
+      .order('created_at',{ascending:true});
+    const filterCoach=currentProfile.role==='coach'
+      ? currentProfile.id
+      : (currentProfile.role==='admin'?window.adminTeacherPreviewId:null);
+    if(filterCoach)q=q.eq('coach_id',filterCoach);
+    const {data,error}=await q;
+    if(error){renderStudents([]);syncState.textContent='⚠️ Öğrenciler alınamadı: '+error.message;return}
+    let visible=data||[];
+    if(currentProfile.role!=='student'){
+      const linkedIds=[...new Set(visible.map(x=>x.student_user_id).filter(Boolean))];
+      let activeIds=new Set();
+      if(linkedIds.length){
+        const pr=await sb.from('profiles').select('id,status,role').in('id',linkedIds).eq('role','student').eq('status','active');
+        if(pr.error){renderStudents([]);syncState.textContent='⚠️ Öğrenci onayları alınamadı: '+pr.error.message;return}
+        activeIds=new Set((pr.data||[]).map(x=>x.id));
+      }
+      visible=visible.filter(x=>x.student_user_id&&activeIds.has(x.student_user_id));
+    }
+    renderStudents(visible.map(dbToStudent));
+    syncState.textContent='☁️ Supabase bağlı • '+(currentProfile.role==='admin'
+      ?(window.adminTeacherPreviewId?'Öğretmen Görünümü':'Sistem Yöneticisi')
+      :currentProfile.role==='coach'?'Eğitim Koçu / Öğretmen':'Öğrenci');
+    await refreshCompletionRate();
+    await refreshAllStudentProgress();
+    renderExamCountdowns();
+    if(!window.adminTeacherPreviewId)await refreshHomeApprovals();
+    enforceRoleUI();
+  };
+
+  // Öğretmen kabul tarihi gelecekteki onaylarda otomatik application_data içine yazılır.
+  // Böylece yeni DB kolonu/migration gerekmez.
+  if(typeof window.approveApplicationV177==='function'){
+    window.approveApplicationV177=async function(id){
+      if(!confirm('Bu kullanıcı başvurusunu onaylıyor musunuz?'))return;
+      const before=await sb.from('profiles').select('role,application_data').eq('id',id).single();
+      const r=await sb.rpc('approve_application',{p_user_id:id});
+      if(r.error)return alert('Onay başarısız: '+r.error.message);
+      if(before.data?.role==='coach'){
+        const app={...(before.data.application_data||{})};
+        if(!app.approved_at)app.approved_at=new Date().toISOString();
+        const u=await sb.from('profiles').update({application_data:app}).eq('id',id);
+        if(u.error)console.warn('Kabul tarihi kaydedilemedi:',u.error.message);
+      }
+      await refreshHomeApprovals();
+      await loadCloudStudents();
+      if(typeof refreshApprovedTeachers==='function')await refreshApprovedTeachers();
+    };
+  }
+
+  // Eski onay butonu kullanılırsa da kabul tarihini kaydet.
+  if(typeof window.setCoachStatus==='function'){
+    const oldSetCoachStatus=window.setCoachStatus;
+    window.setCoachStatus=async function(id,status){
+      if(status!=='active')return oldSetCoachStatus(id,status);
+      if(!confirm('Bu kullanıcı hesabını onaylıyor musunuz?'))return;
+      const p=await sb.from('profiles').select('application_data').eq('id',id).single();
+      const app={...(p.data?.application_data||{})};
+      if(!app.approved_at)app.approved_at=new Date().toISOString();
+      const {error}=await sb.from('profiles').update({
+        status:'active',application_data:app,updated_at:new Date().toISOString()
+      }).eq('id',id);
+      if(error)return alert('İşlem başarısız: '+error.message);
+      await openApplications();
+    };
+  }
+
+  function trDateTime(v){
+    if(!v)return '—';
+    const d=new Date(v);
+    if(Number.isNaN(d.getTime()))return '—';
+    return new Intl.DateTimeFormat('tr-TR',{day:'numeric',month:'long',year:'numeric'}).format(d);
+  }
+
+  // Öğretmen detay: kabul tarihi + elle bitiş tarihi + öğretmen ekranını görüntüle.
+  window.openTeacherDetail=async function(id){
+    const pr=await sb.from('profiles')
+      .select('id,full_name,email,status,created_at,application_data')
+      .eq('id',id).single();
+    if(pr.error)return alert('Öğretmen bilgisi alınamadı: '+pr.error.message);
+    const d=pr.data,app=d.application_data||{};
+    window.teacherDetailCurrentId=id;
+    teacherDetailName.textContent='👨‍🏫 '+(d.full_name||'Öğretmen');
+    teacherDetailMeta.innerHTML=
+      esc(d.email||'')+' • '+(d.status==='active'?'Aktif':'Pasif')+
+      '<div class="teacherDateGrid">'+
+        '<div class="field"><label>Kabul Ediliş Tarihi</label><input value="'+esc(trDateTime(app.approved_at))+'" readonly></div>'+
+        '<div class="field"><label>Bitiş Tarihi</label><input id="teacherEndDate" type="date" value="'+esc(app.end_date||'')+'"></div>'+
+      '</div>'+
+      '<div class="toolbar"><button class="primary small" onclick="saveTeacherEndDate()">Bitiş Tarihini Kaydet</button>'+
+      '<button class="green small" onclick="previewTeacherPanel(\''+esc(id)+'\',\''+esc(d.full_name||'Öğretmen').replace(/'/g,"&#39;")+'\')">👁 Öğretmen Ekranını Gör</button></div>';
+    teacherDetailStudents.innerHTML='Yükleniyor…';
+    document.getElementById('teacherDetailModal').classList.add('show');
+    const st=await sb.from('students')
+      .select('id,full_name,grade,program_type,exam_stage,field,student_phone')
+      .eq('coach_id',id).order('full_name',{ascending:true});
+    if(st.error){teacherDetailStudents.textContent='Öğrenciler alınamadı: '+st.error.message;return}
+    const a=st.data||[];
+    teacherDetailStudents.innerHTML='<h3>Öğrencileri ('+a.length+')</h3>'+
+      (a.length?'<table><thead><tr><th>Öğrenci</th><th>Sınıf</th><th>Program</th><th>Telefon</th></tr></thead><tbody>'+
+      a.map(x=>`<tr><td><button class="studentNameLink" onclick="closeModal('teacherDetailModal');openStudentCenter('${x.id}')">${esc(x.full_name||'—')}</button></td><td>${esc(x.grade||'—')}</td><td>${esc(x.program_type==='YKS'?'YKS - '+(x.exam_stage||'TYT'):(x.program_type||'—'))}</td><td>${esc(x.student_phone||'—')}</td></tr>`).join('')+
+      '</tbody></table>':'<div class="empty">Bu öğretmene bağlı öğrenci yok.</div>');
+  };
+
+  window.saveTeacherEndDate=async function(){
+    if(currentProfile?.role!=='admin'||!window.teacherDetailCurrentId)return;
+    const p=await sb.from('profiles').select('application_data').eq('id',teacherDetailCurrentId).single();
+    if(p.error)return alert('Öğretmen bilgisi alınamadı: '+p.error.message);
+    const app={...(p.data?.application_data||{})};
+    app.end_date=document.getElementById('teacherEndDate')?.value||null;
+    const u=await sb.from('profiles').update({application_data:app}).eq('id',teacherDetailCurrentId);
+    if(u.error)return alert('Bitiş tarihi kaydedilemedi: '+u.error.message);
+    alert('Bitiş tarihi kaydedildi.');
+  };
+
+  window.previewTeacherPanel=async function(id,name){
+    if(currentProfile?.role!=='admin')return;
+    window.adminTeacherPreviewId=id;
+    window.adminTeacherPreviewName=name||'Öğretmen';
+    closeModal('teacherDetailModal');
+    document.body.classList.add('teacherPreviewMode');
+    document.getElementById('panelTitle').textContent='Eğitim Koçu Paneli';
+    document.getElementById('roleBadge').textContent='👁 Yönetici Önizlemesi • '+window.adminTeacherPreviewName;
+    let banner=document.getElementById('teacherPreviewBanner');
+    if(!banner){
+      banner=document.createElement('div');
+      banner.id='teacherPreviewBanner';
+      banner.innerHTML='<b id="teacherPreviewText"></b><button class="secondary small" onclick="exitTeacherPreview()">← Yönetici Ekranına Dön</button>';
+      document.getElementById('coach')?.prepend(banner);
+    }
+    document.getElementById('teacherPreviewText').textContent='👨‍🏫 '+window.adminTeacherPreviewName+' öğretmen ekranını görüntülüyorsunuz.';
+    document.getElementById('student')?.classList.remove('show');
+    document.getElementById('coach')?.classList.remove('hide');
+    await loadCloudStudents();
+    window.scrollTo({top:0,behavior:'smooth'});
+  };
+
+  window.exitTeacherPreview=async function(){
+    window.adminTeacherPreviewId=null;
+    window.adminTeacherPreviewName='';
+    document.body.classList.remove('teacherPreviewMode');
+    applyRoleUI();
+    await loadCloudStudents();
+    window.scrollTo({top:0,behavior:'smooth'});
+  };
+
+  // Görev düzenleme: boş alan/saat/soru doğrulaması + anlık kayıt.
+  window.v185SaveTaskEdit=async function(){
+    if(!v185TaskEditId)return;
+    const subject=String(teSubject.value||'').trim();
+    const topic=String(teTopic.value||'').trim();
+    const start=String(teStart.value||'').trim();
+    const end=String(teEnd.value||'').trim();
+    const q=teQuestions.value===''?null:Number(teQuestions.value);
+    if(!subject)return alert('Ders seçmelisiniz.');
+    if(!topic)return alert('Konu / görev seçmelisiniz.');
+    if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(end))
+      return alert('Başlangıç ve bitiş saatini kontrol edin.');
+    if(hmToMin(end)<=hmToMin(start))return alert('Bitiş saati başlangıç saatinden sonra olmalıdır.');
+    if(q!==null&&(!Number.isFinite(q)||q<0))return alert('Soru hedefi 0 veya daha büyük olmalıdır.');
+    const {error}=await sb.from('study_tasks').update({
+      subject,topic,start_time:start,end_time:end,target_questions:q
+    }).eq('id',v185TaskEditId);
+    if(error)return alert('Görev güncellenemedi: '+error.message);
+    closeModal('taskEditV185Modal');
+    await loadScheduleForStudent();
+    alert('Görev güncellendi ve kaydedildi.');
+  };
+
+  // Rol değişimi/oturum sonrası tekrar uygula.
+  const oldApply=window.applyRoleUI;
+  window.applyRoleUI=function(){
+    oldApply?.();
+    enforceRoleUI();
+  };
+  setInterval(enforceRoleUI,1000);
+})();
+</script>
+
 </body></html>
 <script id="v1855InfoDefinitiveFix">
-// \n
-V18.5.6 - self-contained Student Information flow.
+// V18.5.6 - self-contained Student Information flow.
 // No dependency on V18.5 subject catalog helpers or legacy table-cell state.
 (function(){
   const SUBJECTS=['Türkçe','Matematik','Geometri','Tarih','Coğrafya','Felsefe','Din Kültürü','Fizik','Kimya','Biyoloji','Edebiyat','İngilizce'];
