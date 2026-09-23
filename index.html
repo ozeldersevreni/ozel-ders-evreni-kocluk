@@ -1328,9 +1328,6 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
   },true);
 })();
 </script>
-
-
-
 <script id="final196SubjectSelection">
 (function(){
  const norm=s=>String(s||'').trim().toLocaleLowerCase('tr-TR');
@@ -1679,53 +1676,121 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
  };
 })();
 </script>
-<style id="motivationFinalPlacementStyle">
-#roleMotivationCard{position:static!important;inset:auto!important;width:auto!important;max-width:none!important;margin:0 0 14px!important;z-index:auto!important}
-@media(max-width:900px){#roleMotivationCard{margin:12px 0!important}}
-</style>
-<script id="motivationFinalPlacementV2">
+
+
+<script id="extraTaskDeleteV1">
 (function(){
- function textHas(el,needle){return !!el && String(el.textContent||'').toLocaleLowerCase('tr-TR').includes(needle.toLocaleLowerCase('tr-TR'))}
- function nearestCard(el){
-   while(el && el!==document.body){
-     if(el.classList && ([...el.classList].some(c=>/card|panel|box/i.test(c)))) return el;
+  window.isExtraTask=function(t){
+    const d=String(t?.description||'').toLocaleLowerCase('tr-TR');
+    return d==='ekstra ders' || d==='elle eklenen ekstra görev';
+  };
+
+  window.deleteExtraTask=async function(taskId, studentId){
+    if(!canManagePlans() || String(currentProfile?.role||'').toLowerCase()==='student')
+      return alert('Ekstra dersi yalnızca yönetici veya öğretmen silebilir.');
+
+    if(currentProfile?.role==='coach'){
+      const own=await sb.from('students').select('id').eq('id',studentId).eq('coach_id',currentProfile.id).maybeSingle();
+      if(own.error || !own.data) return alert('Yalnızca kendi öğrencinizin ekstra dersini silebilirsiniz.');
+    }
+
+    if(!confirm('Bu ekstra dersi silmek istediğinize emin misiniz?')) return;
+
+    const r=await sb.from('study_tasks').delete().eq('id',taskId).eq('student_id',studentId);
+    if(r.error) return alert('Ekstra ders silinemedi: '+r.error.message);
+
+    await loadScheduleForStudent();
+  };
+
+  // Mevcut haftalık program çizimini bozmadan, ekstra ders satırlarına Sil butonu ekle.
+  const originalLoad=window.loadScheduleForStudent;
+  window.loadScheduleForStudent=async function(){
+    await originalLoad();
+    if(!canManagePlans()) return;
+    const sid=document.getElementById('scheduleStudent')?.value;
+    if(!sid) return;
+
+    const target=typeof scheduleTargetWeek==='function'?scheduleTargetWeek():null;
+    if(!target) return;
+    const p=await sb.from('study_plans').select('id').eq('student_id',sid).eq('week_start',target).maybeSingle();
+    if(p.error || !p.data) return;
+    const tr=await sb.from('study_tasks').select('id,student_id,description').eq('plan_id',p.data.id);
+    if(tr.error) return;
+
+    const extras=new Map((tr.data||[]).filter(isExtraTask).map(x=>[String(x.id),x]));
+    if(!extras.size) return;
+
+    document.querySelectorAll('#scheduleContent button[onclick*="editDraftTask"], #scheduleContent button[onclick*="toggleTaskStatus"]').forEach(btn=>{
+      const row=btn.closest('tr'); if(!row) return;
+      const onclick=btn.getAttribute('onclick')||'';
+      const m=onclick.match(/['"]([^'"]+)['"]/); if(!m) return;
+      const task=extras.get(String(m[1])); if(!task) return;
+      const cell=btn.closest('td'); if(!cell || cell.querySelector('.extraDeleteBtn')) return;
+      const del=document.createElement('button');
+      del.className='danger small extraDeleteBtn';
+      del.style.marginLeft='6px';
+      del.textContent='🗑 Ekstra Dersi Sil';
+      del.onclick=()=>deleteExtraTask(task.id,task.student_id);
+      cell.appendChild(del);
+    });
+  };
+})();
+</script>
+
+<style id="motivationDeterministicFinalStyle">
+#roleMotivationCard{
+  position:static!important; inset:auto!important; width:100%!important;
+  max-width:none!important; margin:0 0 14px!important; z-index:auto!important;
+  box-sizing:border-box!important;
+}
+#managementMotivationSlot{
+  position:fixed; right:22px; top:290px; width:300px; z-index:12;
+}
+@media(max-width:1350px){
+ #managementMotivationSlot{position:static;width:auto;margin:14px 0}
+}
+</style>
+<script id="motivationDeterministicFinalV1">
+(function(){
+ const has=(el,t)=>el&&String(el.textContent||'').toLocaleLowerCase('tr-TR').includes(t.toLocaleLowerCase('tr-TR'));
+ function cardAncestor(el){
+   while(el&&el!==document.body){
+     if(el.classList&&[...el.classList].some(c=>/card|panel|box/i.test(c)))return el;
      el=el.parentElement;
    }
    return null;
  }
- function place(){
-   const card=document.getElementById('roleMotivationCard'); if(!card)return;
-   const role=String(window.currentProfile?.role||'admin').toLowerCase();
-
-   if(role==='student'){
-     const root=document.getElementById('student')||document;
-     const all=[...root.querySelectorAll('h1,h2,h3,h4,div,section')];
-     const yaz=all.find(x=>textHas(x,'Yazılılarım') && (x.children.length<8));
-     const yazCard=nearestCard(yaz);
-     if(yazCard && yazCard.parentElement){
-       yazCard.parentElement.insertBefore(card,yazCard); // Motivation, then Yazılılarım, Konu, Denemeler.
-       return;
-     }
-   }
-
-   // Admin/coach: use the right side of the visible management content, but keep it in normal flow.
-   const root=(role==='student'?document.getElementById('student'):document.getElementById('coach'))||document;
-   const candidates=[...root.querySelectorAll('section,.card,.panel,.box,div')].filter(el=>{
-     const r=el.getBoundingClientRect();
-     return r.width>=240 && r.width<=520 && r.height>=80 && r.right>window.innerWidth*.62 && r.top>70;
-   }).sort((a,b)=>a.getBoundingClientRect().top-b.getBoundingClientRect().top);
-   if(candidates.length){
-     const target=candidates[0], parent=target.parentElement;
-     if(parent){parent.insertBefore(card,target);return;}
-   }
+ function visibleStudent(){
+   const s=document.getElementById('student');
+   return s && (s.classList.contains('show') || getComputedStyle(s).display!=='none');
  }
- window.placeRoleMotivationFinal=place;
- document.addEventListener('DOMContentLoaded',()=>setTimeout(place,900));
- document.addEventListener('click',()=>setTimeout(place,180),true);
- window.addEventListener('resize',()=>setTimeout(place,120));
- setTimeout(place,1500);
+ function studentPlace(card){
+   const root=document.getElementById('student'); if(!root)return false;
+   const candidates=[...root.querySelectorAll('h1,h2,h3,h4,strong,div')];
+   const title=candidates.find(x=>has(x,'Yazılılarım') && x.children.length<6);
+   const yc=cardAncestor(title);
+   if(yc&&yc.parentElement){yc.parentElement.insertBefore(card,yc);return true;}
+   return false;
+ }
+ function managementPlace(card){
+   let slot=document.getElementById('managementMotivationSlot');
+   if(!slot){slot=document.createElement('div');slot.id='managementMotivationSlot';document.body.appendChild(slot);}
+   slot.appendChild(card);
+   return true;
+ }
+ window.placeMotivationFinal=function(){
+   const card=document.getElementById('roleMotivationCard'); if(!card)return;
+   // Preview dahil ekranda öğrenci paneli görünüyorsa öğrenci sağ sütununu kullan.
+   if(visibleStudent() && studentPlace(card))return;
+   managementPlace(card);
+ };
+ document.addEventListener('DOMContentLoaded',()=>setTimeout(placeMotivationFinal,700));
+ document.addEventListener('click',()=>setTimeout(placeMotivationFinal,120),true);
+ window.addEventListener('resize',()=>setTimeout(placeMotivationFinal,100));
+ setTimeout(placeMotivationFinal,1400);
 })();
 </script>
+
 </body></html>
 <script id="v1855InfoDefinitiveFix">
 // V18.5.6 - self-contained Student Information flow.
