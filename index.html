@@ -1259,7 +1259,61 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
   }
   setInterval(previewUI,400);
 })();
-</script>\n</body></html>
+</script>\n
+<script id="final192CentralStudentScope">
+(function(){
+  function scopedCoachId(){
+    if(window.adminTeacherPreviewId) return String(window.adminTeacherPreviewId);
+    if(window.currentProfile?.role==='coach') return String(window.currentProfile.id);
+    return null;
+  }
+  async function scopedStudents(fields){
+    let q=sb.from('students').select(fields).order('full_name',{ascending:true});
+    const coachId=scopedCoachId();
+    if(coachId) q=q.eq('coach_id',coachId);
+    const {data,error}=await q;
+    if(error) throw error;
+    return data||[];
+  }
+
+  window.openSchedule=async function(){
+    document.getElementById('scheduleModal').classList.add('show');
+    const sel=document.getElementById('scheduleStudent'),box=document.getElementById('scheduleContent');
+    box.textContent='Yükleniyor…';
+    const previous=sel.value;
+    try{
+      const rows=await scopedStudents('id,full_name,program_type,field,exam_stage,grade,coach_id');
+      sel.innerHTML=rows.map(x=>`<option value="${escapeHtml(x.id)}">${escapeHtml(x.full_name)} • ${escapeHtml(x.program_type||'')}${x.program_type==='YKS'?' • '+escapeHtml(x.field||x.exam_stage||''):''}</option>`).join('');
+      if(!rows.length){box.innerHTML='<b>Bu öğretmene bağlı öğrenci bulunmuyor.</b>';return}
+      if(rows.some(x=>String(x.id)===String(previous)))sel.value=previous;
+      await loadScheduleForStudent();
+    }catch(e){box.textContent='Öğrenciler alınamadı: '+(e.message||e)}
+  };
+
+  window.fillFeatureStudents=async function(id){
+    const sel=document.getElementById(id),previous=sel?.value||'';
+    const rows=await scopedStudents('id,full_name,grade,program_type,field,exam_stage,coach_id');
+    if(!sel)return rows;
+    sel.innerHTML=rows.map(x=>`<option value="${escapeHtml(x.id)}">${escapeHtml(x.full_name)} • ${escapeHtml(x.program_type||'')} ${escapeHtml(x.exam_stage||'')}</option>`).join('');
+    if(rows.some(x=>String(x.id)===String(previous)))sel.value=previous;
+    return rows;
+  };
+
+  async function sanitizeVisibleSelectors(){
+    const coachId=scopedCoachId(); if(!coachId)return;
+    const ids=new Set((await scopedStudents('id')).map(x=>String(x.id)));
+    for(const id of ['scheduleStudent','topicStudent','mockStudent','reportStudent','aiStudent']){
+      const sel=document.getElementById(id); if(!sel)continue;
+      [...sel.options].forEach(o=>{if(o.value&&!ids.has(String(o.value)))o.remove()});
+    }
+  }
+  document.addEventListener('click',function(){
+    if(scopedCoachId())setTimeout(()=>sanitizeVisibleSelectors().catch(()=>{}),100);
+  },true);
+})();
+</script>
+
+</body></html>
 <script id="v1855InfoDefinitiveFix">
 // V18.5.6 - self-contained Student Information flow.
 // No dependency on V18.5 subject catalog helpers or legacy table-cell state.
