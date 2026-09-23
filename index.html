@@ -1313,6 +1313,86 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 })();
 </script>
 
+
+<script id="final193AllSubjectsTaskEditor">
+(function(){
+  // Görev düzenlemede öğrencinin programına uygun TÜM dersleri getir.
+  window.editDraftTask=async function(id){
+    if(!canManagePlans())return alert('Programı yalnızca yönetici veya koç düzenleyebilir.');
+
+    const {data:t,error}=await sb.from('study_tasks').select('*').eq('id',id).single();
+    if(error)return alert('Görev alınamadı: '+error.message);
+    window.v185TaskEditId=id;
+
+    const {data:st,error:se}=await sb.from('students')
+      .select('program_type,exam_stage,grade,field')
+      .eq('id',t.student_id).single();
+    if(se)return alert('Öğrenci bilgisi alınamadı: '+se.message);
+
+    let q=sb.from('subject_topics').select('subject,topic,program_type,exam_stage,grade,sort_order')
+      .eq('program_type',st.program_type);
+
+    if(st.program_type==='YKS'){
+      const stage=String(st.exam_stage||'TYT').toUpperCase().replace('YKS - ','').trim();
+      q=q.eq('exam_stage',stage);
+    }else if(st.program_type==='LGS'){
+      q=q.eq('grade','8');
+    }else{
+      q=q.eq('grade',String(st.grade));
+    }
+
+    const r=await q.order('subject').order('sort_order');
+    if(r.error)return alert('Ders/konu listesi alınamadı: '+r.error.message);
+
+    window.v185TaskCatalog=r.data||[];
+
+    // EA öğrencilerinde fen derslerini görev editöründe göstermeme kuralını koru.
+    const field=String(st.field||'').toLocaleLowerCase('tr-TR');
+    if(st.program_type==='YKS' && (field.includes('eşit')||field==='ea')){
+      const blocked=['fizik','kimya','biyoloji','fen'];
+      window.v185TaskCatalog=v185TaskCatalog.filter(x=>{
+        const s=String(x.subject||'').toLocaleLowerCase('tr-TR');
+        return !blocked.some(b=>s.includes(b));
+      });
+    }
+
+    let subjects=[...new Set(v185TaskCatalog.map(x=>x.subject).filter(Boolean))];
+    if(t.subject && !subjects.includes(t.subject))subjects.unshift(t.subject);
+
+    teSubject.innerHTML=subjects.map(x=>
+      `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`
+    ).join('');
+
+    teSubject.value=subjects.includes(t.subject)?t.subject:(subjects[0]||'');
+    teSubject.onchange=function(){ v185LoadTaskTopics(''); };
+
+    // Seçilen dersin bütün konuları; mevcut konu varsa seçili.
+    v185LoadTaskTopics(t.topic);
+
+    teStart.value=String(t.start_time||'18:00').slice(0,5);
+    teEnd.value=String(t.end_time||'19:00').slice(0,5);
+    teQuestions.value=t.target_questions??'';
+    document.getElementById('taskEditV185Modal').classList.add('show');
+  };
+
+  window.v185LoadTaskTopics=function(selected){
+    const subject=String(teSubject.value||'');
+    let topics=[...new Set((window.v185TaskCatalog||[])
+      .filter(x=>String(x.subject||'')===subject)
+      .map(x=>x.topic)
+      .filter(Boolean))];
+
+    if(selected && !topics.includes(selected))topics.unshift(selected);
+
+    teTopic.innerHTML=topics.length
+      ? topics.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('')
+      : '<option value="">Bu ders için konu bulunamadı</option>';
+
+    if(selected && topics.includes(selected))teTopic.value=selected;
+  };
+})();
+</script>
+
 </body></html>
 <script id="v1855InfoDefinitiveFix">
 // V18.5.6 - self-contained Student Information flow.
