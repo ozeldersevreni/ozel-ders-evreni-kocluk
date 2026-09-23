@@ -1184,7 +1184,82 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 })();
 </script>
 
-</body></html>
+\n<script id="final192VerifiedFix">
+(function(){
+  // 1) Öğretmen önizlemesi: yalnız seçili öğretmenin öğrencilerini yükle.
+  window.loadCloudStudents=async function(){
+    syncState.textContent='☁️ Öğrenciler Supabase’den yükleniyor…';
+    const {data,error}=await sb.from('students').select('id,student_user_id,coach_id,full_name,grade,program_type,exam_stage,field,target,daily_minutes,strong_subjects,weak_subjects,coach_notes,school_status,student_phone,parent_name,parent_phone').order('created_at',{ascending:true});
+    if(error){renderStudents([]);syncState.textContent='⚠️ Öğrenciler alınamadı: '+error.message;return;}
+    let rows=data||[];
+    const previewId=window.adminTeacherPreviewId||null;
+    if(previewId) rows=rows.filter(x=>String(x.coach_id||'')===String(previewId));
+    else if(currentProfile?.role==='coach') rows=rows.filter(x=>String(x.coach_id||'')===String(currentProfile.id));
+
+    const ids=rows.map(x=>x.student_user_id).filter(Boolean);
+    if(ids.length){
+      const pr=await sb.from('profiles').select('id,status').in('id',ids);
+      if(!pr.error){const active=new Set((pr.data||[]).filter(p=>p.status==='active').map(p=>p.id));rows=rows.filter(x=>!x.student_user_id||active.has(x.student_user_id));}
+    }
+    if(currentProfile?.role==='admin' && !previewId){
+      const tr=await sb.from('profiles').select('id,full_name,status').eq('role','coach').in('status',['active','disabled']).order('full_name',{ascending:true});
+      renderStudentsGrouped(rows,tr.error?[]:(tr.data||[]));
+    }else{
+      renderStudents(rows.map(dbToStudent));
+    }
+    const countEl=document.getElementById('count'); if(countEl)countEl.textContent=String(rows.length);
+    syncState.textContent='☁️ Bulut ile senkronize';
+    try{await refreshCompletionRate();}catch(e){}
+    try{await refreshAllStudentProgress();}catch(e){}
+    try{renderExamCountdowns();}catch(e){}
+    if(!previewId){try{if(typeof refreshHomeApprovals==='function')await refreshHomeApprovals();}catch(e){} try{await refreshApprovedTeachers();}catch(e){}}
+  };
+
+  // 2) Görev düzenleme: konu kataloğundaki bütün ders ve konuları kullan.
+  window.v185LoadTaskTopics=function(selected=''){
+    const subject=String(document.getElementById('teSubject')?.value||'');
+    let topics=(window.v185TaskCatalog||[]).filter(x=>String(x.subject||'')===subject).map(x=>String(x.topic||'').trim()).filter(Boolean);
+    topics=[...new Set(topics)];
+    if(selected && !topics.includes(selected)) topics.unshift(selected);
+    const el=document.getElementById('teTopic');
+    if(!el)return;
+    el.innerHTML=topics.length?topics.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join(''):'<option value="">Konu bulunamadı</option>';
+    if(selected && topics.includes(selected))el.value=selected;
+  };
+
+  window.editDraftTask=async function(id){
+    if(!canManagePlans())return alert('Programı yalnızca yönetici veya koç düzenleyebilir.');
+    const {data:t,error}=await sb.from('study_tasks').select('*').eq('id',id).single();
+    if(error)return alert('Görev alınamadı: '+error.message);
+    window.v185TaskEditId=id;
+    // Tüm katalog: ders değiştiğinde o derse ait tüm kayıtlı konular gelir.
+    const r=await sb.from('subject_topics').select('subject,topic').order('subject').order('sort_order');
+    if(r.error)return alert('Ders/konu listesi alınamadı: '+r.error.message);
+    window.v185TaskCatalog=r.data||[];
+    const subjects=[...new Set(v185TaskCatalog.map(x=>String(x.subject||'').trim()).filter(Boolean))];
+    if(t.subject && !subjects.includes(t.subject))subjects.unshift(t.subject);
+    const sub=document.getElementById('teSubject');
+    sub.innerHTML=subjects.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+    sub.value=t.subject||subjects[0]||'';
+    v185LoadTaskTopics(t.topic||'');
+    teStart.value=String(t.start_time||'18:00').slice(0,5);
+    teEnd.value=String(t.end_time||'19:00').slice(0,5);
+    teQuestions.value=t.target_questions??'';
+    document.getElementById('taskEditV185Modal').classList.add('show');
+  };
+
+  // Önizlemede yöneticiye özel menüleri kapat.
+  function previewUI(){
+    const on=!!window.adminTeacherPreviewId;
+    document.querySelectorAll('#appSidebar .nav button,.side .nav button').forEach(b=>{
+      const txt=(b.textContent||'').toLocaleLowerCase('tr-TR');
+      const adminOnly=txt.includes('öğretmenlerim')||txt.includes('onay')||txt.includes('uygulama güncelleme');
+      if(adminOnly)b.style.display=on?'none':'';
+    });
+  }
+  setInterval(previewUI,400);
+})();
+</script>\n</body></html>
 <script id="v1855InfoDefinitiveFix">
 // V18.5.6 - self-contained Student Information flow.
 // No dependency on V18.5 subject catalog helpers or legacy table-cell state.
