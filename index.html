@@ -1572,6 +1572,101 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 })();
 </script>
 
+
+<script id="final196SubjectSelection">
+(function(){
+ const norm=s=>String(s||'').trim().toLocaleLowerCase('tr-TR');
+ const esc=s=>typeof escapeHtml==='function'?escapeHtml(String(s??'')):String(s??'');
+ const mins=v=>{const m=/^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(v||'').trim());return m?Number(m[1])*60+Number(m[2]):null};
+
+ async function allProgramCatalog(st){
+   let q=sb.from('subject_topics')
+     .select('id,subject,topic,program_type,exam_stage,field_scope,grade,sort_order')
+     .eq('program_type',st.program_type);
+   if(st.program_type==='LGS') q=q.eq('grade','8');
+   else if(st.program_type==='ARA') q=q.eq('grade',String(st.grade||''));
+   const r=await q.order('subject').order('sort_order');
+   if(r.error)throw r.error;
+   let rows=r.data||[];
+
+   if(st.program_type==='YKS'){
+     const field=norm(st.field);
+     // EA öğrencisinde kullanıcının kesin kuralı: fen derslerini gösterme.
+     if(field.includes('eşit')||field==='ea'){
+       rows=rows.filter(x=>!['fizik','kimya','biyoloji','fen'].some(b=>norm(x.subject).includes(b)));
+     }
+   }
+   return rows;
+ }
+
+ window.editDraftTask=async function(id){
+   if(!canManagePlans())return alert('Programı yalnızca yönetici veya koç düzenleyebilir.');
+   const tr=await sb.from('study_tasks').select('*').eq('id',id).single();
+   if(tr.error)return alert('Görev alınamadı: '+tr.error.message);
+   const t=tr.data; window.v185TaskEditId=id;
+
+   const sr=await sb.from('students').select('program_type,exam_stage,grade,field').eq('id',t.student_id).single();
+   if(sr.error)return alert('Öğrenci bilgisi alınamadı: '+sr.error.message);
+
+   try{ window.v185TaskCatalog=await allProgramCatalog(sr.data); }
+   catch(e){ return alert('Ders/konu listesi alınamadı: '+(e.message||e)); }
+
+   let subjects=[...new Set((window.v185TaskCatalog||[])
+     .map(x=>String(x.subject||'').trim()).filter(Boolean))]
+     .sort((a,b)=>a.localeCompare(b,'tr'));
+   if(t.subject&&!subjects.includes(t.subject))subjects.unshift(t.subject);
+
+   teSubject.innerHTML=subjects.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+   teSubject.value=subjects.includes(t.subject)?t.subject:(subjects[0]||'');
+   teSubject.disabled=false;
+   teSubject.onchange=()=>window.v185LoadTaskTopics('');
+   window.v185LoadTaskTopics(t.topic);
+
+   teStart.value=String(t.start_time||'18:00').slice(0,5);
+   teEnd.value=String(t.end_time||'19:00').slice(0,5);
+   teQuestions.value=t.target_questions??'';
+   document.getElementById('taskEditV185Modal').classList.add('show');
+ };
+
+ window.v185LoadTaskTopics=function(selected){
+   const subject=String(teSubject.value||'');
+   let topics=[...new Set((window.v185TaskCatalog||[])
+     .filter(x=>String(x.subject||'')===subject)
+     .map(x=>String(x.topic||'').trim()).filter(Boolean))];
+   if(selected&&!topics.includes(selected))topics.unshift(selected);
+   teTopic.innerHTML=topics.length
+     ?topics.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')
+     :'<option value="">Bu ders için konu bulunamadı</option>';
+   if(selected&&topics.includes(selected))teTopic.value=selected;
+ };
+
+ // Çalıştığı canlı testle doğrulanan saat/soru kayıt mantığını koru.
+ window.v185SaveTaskEdit=async function(){
+   if(!window.v185TaskEditId)return alert('Düzenlenecek görev bulunamadı.');
+   const subject=String(teSubject.value||'').trim(),topic=String(teTopic.value||'').trim();
+   const start=String(teStart.value||'').trim(),end=String(teEnd.value||'').trim();
+   const questions=teQuestions.value===''?null:Number(teQuestions.value);
+   if(!subject)return alert('Ders seçmelisiniz.');
+   if(!topic)return alert('Konu / görev seçmelisiniz.');
+   const a=mins(start),b=mins(end);
+   if(a===null||b===null)return alert('Başlangıç ve bitiş saatini kontrol edin.');
+   if(b<=a)return alert('Bitiş saati başlangıç saatinden sonra olmalıdır.');
+   if(questions!==null&&(!Number.isFinite(questions)||questions<0))return alert('Soru hedefini kontrol edin.');
+   const btn=document.querySelector('#taskEditV185Modal .modalactions button.primary');
+   if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+   try{
+     const r=await sb.from('study_tasks').update({
+       subject,topic,start_time:start,end_time:end,target_questions:questions
+     }).eq('id',window.v185TaskEditId);
+     if(r.error)throw r.error;
+     closeModal('taskEditV185Modal');
+     await loadScheduleForStudent();
+   }catch(e){alert('Görev güncellenemedi: '+(e.message||e));}
+   finally{if(btn){btn.disabled=false;btn.textContent='Kaydet';}}
+ };
+})();
+</script>
+
 </body></html>
 <script id="v1855InfoDefinitiveFix">
 // V18.5.6 - self-contained Student Information flow.
