@@ -1123,6 +1123,67 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 })();
 </script>
 
+
+<script id="final191LiveFix">
+(function(){
+  // Canlı test düzeltmesi: eski prompt() editörünü kesin olarak devre dışı bırak.
+  window.editDraftTask=async function(id){
+    if(!canManagePlans())return alert('Programı yalnızca yönetici veya koç düzenleyebilir.');
+    const {data:t,error}=await sb.from('study_tasks').select('*').eq('id',id).single();
+    if(error)return alert('Görev alınamadı: '+error.message);
+    window.v185TaskEditId=id;
+
+    const {data:st,error:se}=await sb.from('students')
+      .select('program_type,exam_stage,grade')
+      .eq('id',t.student_id).single();
+    if(se)return alert('Öğrenci bilgisi alınamadı: '+se.message);
+
+    let q=sb.from('subject_topics').select('subject,topic')
+      .eq('program_type',st.program_type);
+    if(st.program_type==='YKS'){
+      q=q.eq('exam_stage',String(st.exam_stage||'TYT').toUpperCase().replace('YKS - ','').trim());
+    }else if(st.program_type==='LGS'){
+      q=q.eq('grade','8');
+    }else{
+      q=q.eq('grade',String(st.grade));
+    }
+    const r=await q.order('subject').order('sort_order');
+    if(r.error)return alert('Ders/konu listesi alınamadı: '+r.error.message);
+
+    window.v185TaskCatalog=r.data||[];
+    const subjects=[...new Set(v185TaskCatalog.map(x=>x.subject).filter(Boolean))];
+    if(t.subject && !subjects.includes(t.subject))subjects.unshift(t.subject);
+    teSubject.innerHTML=subjects.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+    teSubject.value=t.subject||subjects[0]||'';
+    v185LoadTaskTopics(t.topic);
+    teStart.value=String(t.start_time||'18:00').slice(0,5);
+    teEnd.value=String(t.end_time||'19:00').slice(0,5);
+    teQuestions.value=t.target_questions??'';
+    document.getElementById('taskEditV185Modal').classList.add('show');
+  };
+
+  // Öğretmen önizlemesinde yöneticiye özel menüleri gizle ve sayaçtaki toplam öğrenciyi düzelt.
+  function cleanTeacherPreview(){
+    const on=document.body.classList.contains('teacherPreviewMode');
+    document.querySelectorAll('#appSidebar .nav button,.side .nav button').forEach(b=>{
+      const txt=(b.textContent||'').trim();
+      if(on && (txt.includes('Öğretmenlerim') || txt.includes('Onay') || txt.includes('Uygulama Güncelleme'))){
+        b.dataset.final191Hidden='1'; b.style.display='none';
+      }else if(!on && b.dataset.final191Hidden==='1'){
+        b.style.display=''; delete b.dataset.final191Hidden;
+      }
+    });
+    if(on && window.adminTeacherPreviewId){
+      const rows=[...document.querySelectorAll('#studentRows tr')];
+      const count=rows.filter(r=>!r.classList.contains('teacherGroupRow') && r.querySelector('.studentNameLink')).length;
+      const stat=document.getElementById('statStudents');
+      if(stat)stat.textContent=String(count);
+    }
+  }
+  setInterval(cleanTeacherPreview,500);
+})();
+</script>
+
 </body></html>
 <script id="v1855InfoDefinitiveFix">
 // V18.5.6 - self-contained Student Information flow.
