@@ -2059,4 +2059,77 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 })();
 </script>
 
+<style id="v10ReleaseCss">
+#studentCountdown .examDateAction{margin-top:10px}.examDateAction button{min-height:40px}
+body.realStudentRole #backCoachBtn{display:none!important}
+</style>
+<div class="modal" id="personalExamDateModal"><div class="modalbox" style="width:min(520px,96vw)"><h2>🎯 Sınav Tarihim</h2><div class="field"><label>Sınava gireceğin tarih</label><input id="personalExamDate" type="date"/></div><div class="modalactions"><button class="secondary" onclick="closeModal('personalExamDateModal')">İptal</button><button class="green" id="personalExamDateSave" onclick="savePersonalExamDate()">Kaydet</button></div></div></div>
+<script id="v10ReleasePatch20260924">
+(function(){
+ const E=id=>document.getElementById(id);
+ const esc2=v=>typeof escapeHtml==='function'?escapeHtml(String(v??'')):String(v??'');
+ function fmtDate(raw){if(!raw)return 'Sınav tarihini gir.';try{return new Intl.DateTimeFormat('tr-TR',{dateStyle:'long'}).format(new Date(raw+'T10:00:00'))}catch(_){return raw}}
+ function paintPersonalCountdown(raw){
+   const root=E('studentCountdown');if(!root)return;
+   const title=E('studentCountdownTitle'),note=E('studentCountdownDate');if(title)title.textContent='🎯 Sınava Kalan Süre';
+   if(!raw){if(note)note.textContent='Sınav tarihini gir.';root.querySelectorAll('[data-cd]').forEach(x=>x.textContent='—');return}
+   const now=new Date(),target=new Date(raw+'T10:00:00');if(note)note.textContent=fmtDate(raw);
+   if(target<=now){root.querySelectorAll('[data-cd]').forEach(x=>x.textContent='0');return}
+   let cursor=new Date(now),months=0;while(true){let n=new Date(cursor);n.setMonth(n.getMonth()+1);if(n<=target){months++;cursor=n}else break}
+   let rem=target-cursor,weeks=Math.floor(rem/604800000);rem-=weeks*604800000;let days=Math.floor(rem/86400000);rem-=days*86400000;let hours=Math.floor(rem/3600000);let minutes=Math.floor((rem-hours*3600000)/60000);
+   const vals={months,weeks,days,hours,minutes};Object.entries(vals).forEach(([k,v])=>{const el=root.querySelector(`[data-cd="${k}"]`);if(el)el.textContent=v});
+ }
+ async function loadPersonalExamDate(){
+   if(!window.activeStudentId)return null;
+   const r=await sb.from('students').select('id,full_name,grade,program_type,exam_stage,field,school_status,exam_date').eq('id',activeStudentId).single();
+   if(r.error){console.error('exam_date load',r.error);paintPersonalCountdown(null);return null}
+   const s=r.data||{};
+   const stage=String(s.program_type||'').toUpperCase()==='YKS'?(s.exam_stage||'TYT'):'';
+   const field=String(s.program_type||'').toUpperCase()==='YKS'&&s.field?' • '+esc2(s.field):'';
+   const meta=E('studentIdentity');if(meta)meta.innerHTML=`<b>${esc2(s.full_name||'')}</b> • ${esc2(s.grade||'')} . sınıf • ${esc2(s.program_type||'')}${stage?' '+esc2(stage):''}${field}${s.school_status==='graduate'?'<span class="pill">Mezun</span>':''}`;
+   paintPersonalCountdown(s.exam_date||null);return s.exam_date||null;
+ }
+ function ensureDateButton(){
+   const root=E('studentCountdown');if(!root||E('personalExamDateBtn'))return;
+   const holder=document.createElement('div');holder.className='examDateAction';holder.innerHTML='<button type="button" class="secondary small" id="personalExamDateBtn" onclick="openPersonalExamDate()">📅 Sınav Tarihimi Ayarla</button>';
+   const first=root.firstElementChild;if(first)first.appendChild(holder);else root.prepend(holder);
+ }
+ window.openPersonalExamDate=async function(){if(!activeStudentId)return alert('Öğrenci seçilemedi.');let d='';try{const r=await sb.from('students').select('exam_date').eq('id',activeStudentId).single();if(!r.error)d=r.data?.exam_date||''}catch(_){}E('personalExamDate').value=d;E('personalExamDateModal').classList.add('show')};
+ window.savePersonalExamDate=async function(){
+   if(!activeStudentId)return alert('Öğrenci seçilemedi.');const date=E('personalExamDate').value;if(!date)return alert('Sınav tarihini seçin.');const btn=E('personalExamDateSave');btn.disabled=true;btn.textContent='Kaydediliyor…';
+   try{
+     let error=null;
+     if(currentProfile?.role==='student'){
+       const r=await sb.rpc('set_my_exam_date',{p_date:date});error=r.error;
+     }else{
+       const r=await sb.from('students').update({exam_date:date,updated_at:new Date().toISOString()}).eq('id',activeStudentId);error=r.error;
+     }
+     if(error)throw error;closeModal('personalExamDateModal');paintPersonalCountdown(date);alert('Sınav tarihi kaydedildi.');
+   }catch(e){alert('Sınav tarihi kaydedilemedi: '+(e?.message||e))}finally{btn.disabled=false;btn.textContent='Kaydet'}
+ };
+ // Topic progress: always fetch the student's real coach_id; never trust a stale UI cache.
+ window.saveTopicProgress=async function(topicId,status,pct){
+   const sid=E('topicStudent')?.value;if(!sid)return;let val=Math.max(0,Math.min(100,Number(pct)||0));if(status==='not_started')val=0;if(status==='completed')val=100;
+   try{const st=await sb.from('students').select('coach_id').eq('id',sid).single();if(st.error)throw st.error;if(!st.data?.coach_id)throw new Error('Bu öğrenciye atanmış eğitim koçu bulunamadı.');
+     const payload={student_id:sid,topic_id:topicId,coach_id:st.data.coach_id,status,progress_percent:val,last_studied_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+     const r=await sb.from('student_topic_progress').upsert(payload,{onConflict:'student_id,topic_id'});if(r.error)throw r.error;await loadTopicTracking();
+   }catch(e){alert('Konu ilerlemesi kaydedilemedi: '+(e?.message||e))}
+ };
+ // Student self-entry uses the same percentage rules.
+ const oldSaveStudentTopicEntry=window.saveStudentTopicEntry;
+ window.saveStudentTopicEntry=async function(){
+   const status=E('steStatus')?.value;if(status==='completed')E('stePercent').value=100;if(status==='not_started')E('stePercent').value=0;return oldSaveStudentTopicEntry.apply(this,arguments)
+ };
+ // Remove impossible stage text outside YKS wherever student identity is refreshed.
+ const oldRefresh=window.refreshStudentDashboard;
+ if(typeof oldRefresh==='function')window.refreshStudentDashboard=async function(){const r=await oldRefresh.apply(this,arguments);ensureDateButton();await loadPersonalExamDate();return r};
+ const oldView=window.studentView;
+ if(typeof oldView==='function')window.studentView=async function(){const r=await oldView.apply(this,arguments);ensureDateButton();await loadPersonalExamDate();return r};
+ // Admin has no single universal exam date anymore: remove the misleading global YKS/LGS countdown.
+ function neutralizeAdminCountdown(){const root=E('adminCountdown');if(root)root.style.display='none'}
+ document.addEventListener('DOMContentLoaded',()=>{ensureDateButton();neutralizeAdminCountdown();if(E('v186Build'))E('v186Build').textContent='• V1.0 RC'});
+ setTimeout(()=>{ensureDateButton();neutralizeAdminCountdown()},800);
+})();
+</script>
+
 </body></html>
