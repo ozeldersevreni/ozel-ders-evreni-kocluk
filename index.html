@@ -2064,8 +2064,10 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
     const raw=v('infoHours')?.value??'',hours=raw===''?null:Number(raw);if(hours!==null&&(!Number.isFinite(hours)||hours<0))return alert('Günlük çalışma süresini kontrol edin.');
     const strong=picked('infoStrongChecks'),weak=picked('infoWeakChecks'),overlap=strong.filter(x=>weak.includes(x));if(overlap.length)return alert('Aynı ders hem Güçlü hem Eksik seçilemez: '+overlap.join(', '));
     const payload={target:v('infoGoal')?.value.trim()||null,daily_minutes:hours===null?null:Math.round(hours*60),strong_subjects:strong.join(', ')||null,weak_subjects:weak.join(', ')||null,coach_notes:v('infoNote')?.value.trim()||null,school_status:v('infoSchoolStatus')?.value||'school',student_phone:v('infoStudentPhone')?.value.trim()||null,parent_name:v('infoParentName')?.value.trim()||null,parent_phone:v('infoParentPhone')?.value.trim()||null,exam_date:v('infoExamDate')?.value||null,updated_at:new Date().toISOString()};
-    const coach=v('infoCoach')?.value;if((window.currentProfile?.role==='admin'||(typeof currentProfile!=='undefined'&&currentProfile?.role==='admin'))&&coach)payload.coach_id=coach;
-    try{const b=document.querySelector('#infoModal .modalactions button.green');if(b){b.disabled=true;b.textContent='Kaydediliyor…'}const r=await sb.from('students').update(payload).eq('id',id);if(r.error)throw r.error;alert('Öğrenci bilgileri kaydedildi.');document.getElementById('infoModal')?.classList.remove('show');if(typeof loadCloudStudents==='function')await loadCloudStudents();}
+    try{
+      const current=await sb.from('students').select('coach_id').eq('id',id).single();if(current.error)throw current.error;
+      const selectedCoach=v('infoCoach')?.value||'';payload.coach_id=selectedCoach||current.data?.coach_id;if(!payload.coach_id)throw new Error('Öğrencinin eğitim koçu bulunamadı.');
+      const b=document.querySelector('#infoModal .modalactions button.green');if(b){b.disabled=true;b.textContent='Kaydediliyor…'}const r=await sb.from('students').update(payload).eq('id',id);if(r.error)throw r.error;alert('Öğrenci bilgileri kaydedildi.');document.getElementById('infoModal')?.classList.remove('show');if(typeof loadCloudStudents==='function')await loadCloudStudents();}
     catch(e){alert('Bilgiler kaydedilemedi: '+(e?.message||e))}finally{const b=document.querySelector('#infoModal .modalactions button.green');if(b){b.disabled=false;b.textContent='Kaydet'}}
   };
   function init(){
