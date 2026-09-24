@@ -781,7 +781,7 @@ document.addEventListener('DOMContentLoaded',function(){
 });
 </script>
 <style id="v185Styles">.subjectChecks{display:flex;flex-wrap:wrap;gap:8px;padding:9px;border:1px solid #d8e0ea;border-radius:9px;background:#fafcff;min-height:46px}.subjectCheck{display:inline-flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid #d8e0ea;border-radius:9px;background:#fff;cursor:pointer;font-size:13px}.subjectCheck input{width:auto;min-height:auto;margin:0}.excludedSummary{margin:8px 0;padding:9px 11px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:13px}</style>
-<div class="modal" id="taskEditV185Modal"><div class="modalbox"><h2>✏️ Görevi Düzenle</h2><div class="formgrid"><div class="field"><label>Ders</label><select id="teSubject" onchange="v185LoadTaskTopics()"></select></div><div class="field"><label>Konu / Görev</label><select id="teTopic"></select></div><div class="field"><label>Başlangıç</label><input id="teStart" type="time"/></div><div class="field"><label>Bitiş</label><input id="teEnd" type="time"/></div><div class="field"><label>Soru hedefi</label><input id="teQuestions" min="0" type="number"/></div></div><div class="modalactions"><button class="secondary" onclick="closeModal('taskEditV185Modal')">İptal</button><button class="primary" onclick="v185SaveTaskEdit()">Kaydet</button></div></div></div>
+<div class="modal" id="taskEditV185Modal"><div class="modalbox"><h2>✏️ Görevi Düzenle</h2><div class="formgrid"><div class="field"><label>Ders</label><select id="teSubject" onchange="v185LoadTaskTopics()"></select></div><div class="field"><label>Konu / Görev</label><select id="teTopic"></select></div><div class="field"><label>Başlangıç</label><input id="teStart" type="time"/></div><div class="field"><label>Bitiş</label><input id="teEnd" type="time"/></div><div class="field"><label>Soru hedefi</label><input id="teQuestions" min="0" type="number"/></div></div><div class="modalactions" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><button class="danger" type="button" onclick="v185DeleteTask()">🗑 Bu Dersi Programdan Sil</button><div style="display:flex;gap:8px;margin-left:auto"><button class="secondary" type="button" onclick="closeModal('taskEditV185Modal')">İptal</button><button class="primary" type="button" onclick="v185SaveTaskEdit()">Kaydet</button></div></div></div></div>
 <script id="v185Patch">
 const V185_FALLBACK_SUBJECTS=['Türkçe','Matematik','Geometri','Tarih','Coğrafya','Felsefe','Din Kültürü','Fizik','Kimya','Biyoloji','İngilizce'];let v185SubjectCache=new Map(),v185TaskEditId=null,v185TaskCatalog=[];
 function v185Norm(v){return normalizeSubjectName(v)}function v185Arr(v){if(Array.isArray(v))return v.filter(Boolean);if(!v)return[];return String(v).split(',').map(x=>x.trim()).filter(Boolean)}
@@ -1381,6 +1381,26 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
    document.getElementById('taskEditV185Modal').classList.add('show');
  };
 
+ window.v185DeleteTask=async function(){
+   if(!canManagePlans())return alert('Programdan dersi yalnızca yönetici veya koç silebilir.');
+   if(!window.v185TaskEditId)return alert('Silinecek görev bulunamadı.');
+   const tr=await sb.from('study_tasks').select('id,subject,topic').eq('id',window.v185TaskEditId).single();
+   if(tr.error)return alert('Görev alınamadı: '+tr.error.message);
+   const t=tr.data||{};
+   if(!confirm((t.subject||'Ders')+' — '+(t.topic||'Görev')+' programdan silinsin mi?\n\nYalnızca bu ders silinecek; haftalık program ve konu ilerlemesi korunacak.'))return;
+   const btn=document.querySelector('#taskEditV185Modal button.danger');
+   if(btn){btn.disabled=true;btn.textContent='Siliniyor…';}
+   try{
+     const r=await sb.from('study_tasks').delete().eq('id',window.v185TaskEditId);
+     if(r.error)throw r.error;
+     window.v185TaskEditId=null;
+     closeModal('taskEditV185Modal');
+     await loadScheduleForStudent();
+     alert('Ders programdan silindi.');
+   }catch(e){alert('Ders silinemedi: '+(e.message||e));}
+   finally{if(btn){btn.disabled=false;btn.textContent='🗑 Bu Dersi Programdan Sil';}}
+ };
+
  window.v185LoadTaskTopics=function(selected){
    const subject=String(teSubject.value||'');
    let topics=[...new Set((window.v185TaskCatalog||[])
@@ -1692,7 +1712,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
      <div class="field"><label>Başlangıç</label><input id="manualStart" type="time" value="18:00"></div>
      <div class="field"><label>Bitiş</label><input id="manualEnd" type="time" value="19:00"></div>
      <div class="field"><label>Soru hedefi</label><input id="manualQuestions" type="number" min="0" placeholder="Örn. 40"></div>
-     <div class="field"><label>İlerleme</label><input id="manualProgressPreview" readonly value="%0"></div>
+     <div class="field"><label>İlerleme</label><input id="manualProgressPreview" readonly value="İlerleme: %0"></div>
      <div class="field full"><label>Açıklama (isteğe bağlı)</label><input id="manualDescription" placeholder="Örn. Konu tekrarı + soru çözümü"></div>
     </div>
     <div class="modalactions" style="padding-bottom:0"><button class="green" id="manualAddBtn" onclick="saveManualPlanTask()">➕ Programa Ekle</button></div>
@@ -1750,7 +1770,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
  };
  window.renderManualHistory=function(){if(!ctx)return;const f=document.getElementById('manualHistorySubject').value;const rows=ctx.catalog.filter(x=>!f||x.subject===f);document.getElementById('manualHistory').innerHTML=rows.length?rows.map(x=>{const p=topicProgress(x.id),h=topicHistory(x.subject,x.topic),pct=p?.progress_percent||0,status=p?.status==='completed'?'✓ Tamamlandı':p?.status==='review_needed'?'↻ Tekrar gerekli':p?.status==='in_progress'?'▶ Çalışılıyor':'Başlanmadı';return '<div class="manualHistoryItem"><b>'+esc(x.subject)+' — '+esc(x.topic)+'</b><span class="manualProgress">%'+pct+'</span> • '+status+'<div class="manualMeta">'+(h?'Daha önce programlandı • Son: '+fmtDate(h.task_date):'Henüz programa verilmedi')+'</div></div>'}).join(''):'Bu filtrede konu bulunamadı.'};
  window.manualLoadTopics=function(){if(!ctx)return;const s=document.getElementById('manualSubject').value,rows=ctx.catalog.filter(x=>x.subject===s);document.getElementById('manualTopic').innerHTML=rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.topic)+'</option>').join('');manualTopicChanged()};
- window.manualTopicChanged=function(){if(!ctx)return;const id=document.getElementById('manualTopic').value,p=topicProgress(id);document.getElementById('manualProgressPreview').value='%'+(p?.progress_percent||0)};
+ window.manualTopicChanged=function(){if(!ctx)return;const id=document.getElementById('manualTopic').value,p=topicProgress(id);document.getElementById('manualProgressPreview').value='İlerleme: %'+(p?.progress_percent||0)};
  window.saveManualPlanTask=async function(){if(!ctx)return;const btn=document.getElementById('manualAddBtn'),topicId=document.getElementById('manualTopic').value,row=ctx.catalog.find(x=>String(x.id)===String(topicId));if(!row)return alert('Konu seçin.');const day=document.getElementById('manualDay').value,start=document.getElementById('manualStart').value,end=document.getElementById('manualEnd').value,qv=document.getElementById('manualQuestions').value,desc=document.getElementById('manualDescription').value.trim();if(!start||!end||end<=start)return alert('Başlangıç ve bitiş saatini kontrol edin.');
    try{btn.disabled=true;btn.textContent='Kaydediliyor…';let pr=await sb.from('study_plans').select('id,status').eq('student_id',ctx.student.id).eq('week_start',ctx.week).maybeSingle();if(pr.error)throw pr.error;let plan=pr.data;if(!plan){const ins=await sb.from('study_plans').insert({student_id:ctx.student.id,coach_id:ctx.student.coach_id,week_start:ctx.week,status:'draft'}).select('id,status').single();if(ins.error)throw ins.error;plan=ins.data}
      const overlap=await sb.from('study_tasks').select('id,start_time,end_time').eq('plan_id',plan.id).eq('task_date',day);if(overlap.error)throw overlap.error;const toMin=v=>{const a=String(v).split(':');return Number(a[0])*60+Number(a[1])},a=toMin(start),b=toMin(end);if((overlap.data||[]).some(x=>a<toMin(x.end_time)&&b>toMin(x.start_time)))return alert('Bu saat aralığında başka bir görev var.');
