@@ -2140,3 +2140,72 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
   };
 })();
 </script>
+
+<script id="personalStudentExamDateOnly20260925">
+(function(){
+  let personalExamDateCache=null, personalExamDateStudent=null;
+  const E=id=>document.getElementById(id);
+  function ensurePersonalExamUI(){
+    const root=E('studentCountdown');
+    if(root && !E('personalExamDateBtn')){
+      const head=root.querySelector('.countdownHead');
+      if(head){
+        const b=document.createElement('button');
+        b.type='button'; b.id='personalExamDateBtn'; b.className='countdownEdit';
+        b.textContent='⚙ Sınav Tarihim'; b.onclick=openPersonalStudentExamDate;
+        head.appendChild(b);
+      }
+    }
+    if(!E('personalStudentExamDateModal')){
+      const d=document.createElement('div'); d.className='modal'; d.id='personalStudentExamDateModal';
+      d.innerHTML='<div class="modalbox"><div class="field"><label>Sınav Tarihi</label><input id="personalStudentExamDate" type="date"></div><div class="modalactions"><button type="button" class="secondary" onclick="closeModal(\'personalStudentExamDateModal\')">İptal</button><button type="button" class="primary" id="personalStudentExamDateSave" onclick="savePersonalStudentExamDate()">Kaydet</button></div></div>';
+      document.body.appendChild(d);
+    }
+  }
+  async function loadPersonalStudentExamDate(){
+    if(!window.activeStudentId) return null;
+    if(personalExamDateStudent===activeStudentId && personalExamDateCache!==null) return personalExamDateCache;
+    const {data,error}=await sb.from('students').select('exam_date').eq('id',activeStudentId).single();
+    if(error) return null;
+    personalExamDateStudent=activeStudentId; personalExamDateCache=data?.exam_date||'';
+    return personalExamDateCache;
+  }
+  function paintPersonalStudentCountdown(raw){
+    const root=E('studentCountdown'); if(!root)return;
+    const title=E('studentCountdownTitle'),note=E('studentCountdownDate');
+    if(title)title.textContent='🎯 Sınava Geri Sayım';
+    const set=(k,v)=>{const x=root.querySelector('[data-cd="'+k+'"]');if(x)x.textContent=v};
+    if(!raw){if(note)note.textContent='Sınav tarihi ayarlanmadı.';['months','weeks','days','hours','minutes'].forEach(k=>set(k,'—'));return}
+    const target=new Date(raw+'T10:00:00'),now=new Date();
+    if(note)note.textContent=new Intl.DateTimeFormat('tr-TR',{dateStyle:'long'}).format(target);
+    if(target<=now){['months','weeks','days','hours','minutes'].forEach(k=>set(k,0));return}
+    let cursor=new Date(now),months=0;
+    while(true){const n=new Date(cursor);n.setMonth(n.getMonth()+1);if(n<=target){months++;cursor=n}else break}
+    let rem=target-cursor,weeks=Math.floor(rem/604800000);rem-=weeks*604800000;
+    let days=Math.floor(rem/86400000);rem-=days*86400000;
+    let hours=Math.floor(rem/3600000);let minutes=Math.floor((rem-hours*3600000)/60000);
+    set('months',months);set('weeks',weeks);set('days',days);set('hours',hours);set('minutes',minutes);
+  }
+  async function refreshPersonalStudentExamDate(){ensurePersonalExamUI();const d=await loadPersonalStudentExamDate();paintPersonalStudentCountdown(d)}
+  window.openPersonalStudentExamDate=async function(){
+    if(!window.activeStudentId)return alert('Öğrenci seçilemedi.');
+    ensurePersonalExamUI(); const d=await loadPersonalStudentExamDate(); E('personalStudentExamDate').value=d||''; E('personalStudentExamDateModal').classList.add('show');
+  };
+  window.savePersonalStudentExamDate=async function(){
+    if(!window.activeStudentId)return alert('Öğrenci seçilemedi.');
+    const value=E('personalStudentExamDate').value;if(!value)return alert('Sınav tarihini seçin.');
+    const btn=E('personalStudentExamDateSave');btn.disabled=true;btn.textContent='Kaydediliyor…';
+    try{
+      const {error}=await sb.from('students').update({exam_date:value,updated_at:new Date().toISOString()}).eq('id',activeStudentId);
+      if(error)throw error;
+      personalExamDateStudent=activeStudentId;personalExamDateCache=value;paintPersonalStudentCountdown(value);closeModal('personalStudentExamDateModal');alert('Sınav tarihi kaydedildi.');
+    }catch(e){alert('Sınav tarihi kaydedilemedi: '+(e?.message||e))}finally{btn.disabled=false;btn.textContent='Kaydet'}
+  };
+  let lastStudent=null;
+  setInterval(function(){
+    ensurePersonalExamUI();
+    if(window.activeStudentId && activeStudentId!==lastStudent){lastStudent=activeStudentId;personalExamDateStudent=null;personalExamDateCache=null;refreshPersonalStudentExamDate()}
+  },800);
+  document.addEventListener('DOMContentLoaded',ensurePersonalExamUI);
+})();
+</script>
