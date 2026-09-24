@@ -1799,7 +1799,85 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 
 </body></html>
 <script id="v1855InfoDefinitiveFix">
-// V18.5.6 - self-contained Student Information flow.
+// V18.5.6 \n<!-- FINAL_STABILITY_FIX_20260924 -->
+<script id="finalStabilityFix20260924">
+(function(){
+ const norm=v=>String(v||'').trim().toLocaleLowerCase('tr-TR');
+ const isEA=st=>String(st?.program_type||'').toUpperCase()==='YKS' && (norm(st?.field).includes('eşit')||norm(st?.field)==='ea');
+ const blockedEA=subject=>['fizik','kimya','biyoloji','fen'].some(x=>norm(subject).includes(x));
+
+ // 1) Canonical topic catalogue: EA never receives science topics.
+ const previousCatalog=window.getCatalogForStudent;
+ window.getCatalogForStudent=async function(student){
+   let rows=await previousCatalog(student);
+   try{
+     const r=await sb.from('students').select('program_type,field').eq('id',student.id).single();
+     if(!r.error && isEA(r.data)) rows=(rows||[]).filter(x=>!blockedEA(x.subject));
+   }catch(_){}
+   return rows||[];
+ };
+
+ // 2) Canonical subject list, including written-exam dropdowns.
+ const previousV185Subjects=window.v185Subjects;
+ window.v185Subjects=async function(st){
+   let full=st||{};
+   if(full.id && (!('field' in full)||!('program_type' in full))){
+     try{const r=await sb.from('students').select('program_type,exam_stage,grade,field').eq('id',full.id).single();if(!r.error)full={...full,...r.data}}catch(_){}
+   }
+   let rows=await previousV185Subjects(full);
+   return isEA(full)?(rows||[]).filter(x=>!blockedEA(x)):rows;
+ };
+ window.v185Written=async function(selected=''){
+   if(!window.activeStudentId)return;
+   const r=await sb.from('students').select('id,program_type,exam_stage,grade,field').eq('id',activeStudentId).single();
+   const subjects=r.error?[]:await window.v185Subjects(r.data||{});
+   const sel=document.getElementById('writtenSubject');if(!sel)return;
+   sel.innerHTML=(subjects||[]).map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+   sel.value=(selected&&subjects.includes(selected))?selected:(subjects[0]||'');
+ };
+ window.openWrittenExamModal=async function(){editingWrittenId=null;writtenDate.value='';await window.v185Written();document.getElementById('writtenExamModal').classList.add('show')};
+ window.editWrittenExam=async function(id,subject,date){editingWrittenId=id;writtenDate.value=date;await window.v185Written(subject);document.getElementById('writtenExamModal').classList.add('show')};
+
+ // 3) Topic status and percentage always stay consistent.
+ window.saveTopicProgress=async function(topicId,status,pct){
+   const sid=document.getElementById('topicStudent')?.value;if(!sid)return;
+   const row=(window.topicCache||[]).find(x=>String(x.id)===String(topicId));
+   let val=Math.max(0,Math.min(100,Number(pct)||0));
+   if(status==='not_started')val=0;if(status==='completed')val=100;
+   const payload={student_id:sid,topic_id:topicId,coach_id:row?.coach_id||null,status,progress_percent:val,last_studied_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+   const {error}=await sb.from('student_topic_progress').upsert(payload,{onConflict:'student_id,topic_id'});
+   if(error)return alert('Konu ilerlemesi kaydedilemedi: '+error.message);
+   await loadTopicTracking();
+ };
+
+ // 4) Student countdown follows the selected/real student's program type, never the admin list fallback.
+ window.__studentExamType='YKS';
+ async function syncStudentExamType(){
+   if(!window.activeStudentId)return window.__studentExamType;
+   try{const r=await sb.from('students').select('program_type').eq('id',activeStudentId).single();if(!r.error)window.__studentExamType=String(r.data?.program_type||'YKS').toUpperCase()==='LGS'?'LGS':'YKS'}catch(_){}
+   return window.__studentExamType;
+ }
+ window.examTypeForStudent=function(){return window.__studentExamType||'YKS'};
+ const oldRefresh=window.refreshStudentDashboard;
+ if(typeof oldRefresh==='function')window.refreshStudentDashboard=async function(){await syncStudentExamType();const out=await oldRefresh.apply(this,arguments);try{renderExamCountdowns()}catch(_){}return out};
+ const oldStudentView=window.studentView;
+ if(typeof oldStudentView==='function')window.studentView=async function(){const out=await oldStudentView.apply(this,arguments);await syncStudentExamType();try{renderExamCountdowns()}catch(_){}return out};
+
+ // Student topic entry gets the same canonical filtered catalogue.
+ const oldOpenStudentTopicEntry=window.openStudentTopicEntry;
+ if(typeof oldOpenStudentTopicEntry==='function')window.openStudentTopicEntry=async function(){
+   if(!activeStudentId)return alert('Öğrenci seçilemedi.');
+   try{
+     const catalog=await window.getCatalogForStudent({id:activeStudentId});
+     const sel=document.getElementById('steTopic');
+     sel.innerHTML=(catalog||[]).map(t=>`<option value="${t.id}">${escapeHtml(t.subject)} — ${escapeHtml(t.topic)}</option>`).join('');
+     if(!sel.options.length)return alert('Bu öğrenci için konu kataloğu bulunamadı.');
+     steQuestions.value=0;stePercent.value=10;steStatus.value='in_progress';document.getElementById('studentTopicEntryModal').classList.add('show');
+   }catch(e){alert('Konu listesi alınamadı: '+(e.message||e))}
+ };
+})();
+</script>
+- self-contained Student Information flow.
 // No dependency on V18.5 subject catalog helpers or legacy table-cell state.
 (function(){
   const SUBJECTS=['Türkçe','Matematik','Geometri','Tarih','Coğrafya','Felsefe','Din Kültürü','Fizik','Kimya','Biyoloji','Edebiyat','İngilizce'];
@@ -1998,31 +2076,3 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
   document.addEventListener('DOMContentLoaded',init);
 })();
 </script>
-
-<!-- RC2: isolated per-student countdown. Appended only after all existing patches. -->
-<style id="personalCountdownStyle">
-#adminCountdown,#studentCountdown{display:none!important}
-.personalExamCountdown{margin:14px 0 18px;background:linear-gradient(135deg,#102b46,#1769e0);color:#fff;border-radius:18px;padding:18px 20px;box-shadow:0 8px 24px #102b4625}
-.personalExamHead{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.personalExamTitle{font-size:18px;font-weight:900}.personalExamDate{font-size:12px;opacity:.88;margin-top:5px}
-.personalExamGrid{display:grid;grid-template-columns:repeat(4,minmax(80px,1fr));gap:10px;margin-top:14px}.personalExamUnit{background:#ffffff18;border:1px solid #ffffff2c;border-radius:13px;padding:12px;text-align:center}.personalExamValue{font-size:27px;font-weight:900;line-height:1}.personalExamLabel{font-size:12px;margin-top:6px;opacity:.88}.personalExamEdit{border:1px solid #ffffff55;background:#ffffff18;color:#fff;border-radius:9px;padding:8px 11px;font-weight:800;cursor:pointer}
-@media(max-width:600px){.personalExamGrid{grid-template-columns:repeat(2,1fr)}}
-</style>
-<div class="modal" id="personalExamModal"><div class="modalbox"><h2>🎯 Sınava Kalan Süre</h2><div class="field"><label>Başlık</label><input id="personalExamTitleInput" maxlength="80" placeholder="Örn. YKS 2027"/></div><div class="field"><label>Sınav tarihi</label><input id="personalExamDateInput" type="date"/></div><div class="modalactions"><button class="secondary" type="button" onclick="closeModal('personalExamModal')">İptal</button><button class="green" type="button" onclick="savePersonalExamCountdown()">Kaydet</button></div></div></div>
-<script id="personalExamCountdownModule">
-(function(){
-'use strict';
-let timer=null,state={studentId:null,title:'Sınava Kalan Süre',date:''};
-const esc=v=>typeof escapeHtml==='function'?escapeHtml(String(v??'')):String(v??'');
-const parseDate=iso=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso||''));return m?new Date(+m[1],+m[2]-1,+m[3],23,59,59,999):null};
-const trDate=iso=>{const d=parseDate(iso);return d?new Intl.DateTimeFormat('tr-TR',{day:'numeric',month:'long',year:'numeric',weekday:'long'}).format(d):''};
-const canEdit=()=>['admin','coach','teacher','student'].includes(String(window.currentProfile?.role||'').toLowerCase());
-function box(){let b=document.getElementById('personalExamCountdown');if(b)return b;const old=document.getElementById('studentCountdown');if(!old?.parentNode)return null;b=document.createElement('div');b.id='personalExamCountdown';b.className='personalExamCountdown';old.insertAdjacentElement('afterend',b);return b}
-function paint(){const b=box();if(!b)return;const t=parseDate(state.date);let v={days:'—',hours:'—',minutes:'—',seconds:'—'};if(t){let x=Math.max(0,t-Date.now());v.days=Math.floor(x/86400000);x%=86400000;v.hours=Math.floor(x/3600000);x%=3600000;v.minutes=Math.floor(x/60000);x%=60000;v.seconds=Math.floor(x/1000)}b.innerHTML=`<div class="personalExamHead"><div><div class="personalExamTitle">🎯 ${esc(state.title||'Sınava Kalan Süre')}</div><div class="personalExamDate">${state.date?esc(trDate(state.date)):'Sınav tarihi ayarlanmadı.'}</div></div>${canEdit()?'<button class="personalExamEdit" type="button" onclick="openPersonalExamCountdown()">✏️ Düzenle</button>':''}</div><div class="personalExamGrid">${[['days','Gün'],['hours','Saat'],['minutes','Dakika'],['seconds','Saniye']].map(([k,l])=>`<div class="personalExamUnit"><div class="personalExamValue">${v[k]}</div><div class="personalExamLabel">${l}</div></div>`).join('')}</div>`}
-async function load(id){if(!id)return;state.studentId=id;const r=await sb.from('students').select('id,exam_date,exam_countdown_title').eq('id',id).single();if(r.error){console.error('Sayaç yüklenemedi:',r.error);state.title='Sınava Kalan Süre';state.date='';paint();return}state.title=(r.data.exam_countdown_title||'Sınava Kalan Süre').trim();state.date=r.data.exam_date||'';paint();if(timer)clearInterval(timer);timer=setInterval(paint,1000)}
-window.openPersonalExamCountdown=function(){if(!state.studentId)return alert('Öğrenci seçilemedi.');personalExamTitleInput.value=state.title||'Sınava Kalan Süre';personalExamDateInput.value=state.date||'';personalExamModal.classList.add('show')};
-window.savePersonalExamCountdown=async function(){if(!state.studentId)return alert('Öğrenci seçilemedi.');const title=(personalExamTitleInput.value||'').trim()||'Sınava Kalan Süre',date=personalExamDateInput.value;if(!date)return alert('Sınav tarihini seçin.');const r=await sb.from('students').update({exam_date:date,exam_countdown_title:title,updated_at:new Date().toISOString()}).eq('id',state.studentId);if(r.error)return alert('Sayaç kaydedilemedi: '+r.error.message);state.title=title;state.date=date;closeModal('personalExamModal');paint()};
-const oldRefresh=window.refreshStudentDashboard;
-window.refreshStudentDashboard=async function(){const r=await oldRefresh.apply(this,arguments);if(window.activeStudentId)await load(window.activeStudentId);return r};
-})();
-</script>
-
