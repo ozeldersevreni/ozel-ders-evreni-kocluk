@@ -1545,24 +1545,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 })();
 </script>
 
-<div class="modal" id="extraTaskModal" style="z-index:2147483000">
-<div class="modalbox">
-<h2>➕ Ekstra Ders Ekle</h2>
-<div id="extraTaskDayInfo" style="margin-bottom:12px;font-weight:700"></div>
-<div class="formgrid">
-<div class="field"><label>Ders</label><select id="extraSubject" onchange="extraLoadTopics()"></select></div>
-<div class="field"><label>Konu / Görev</label><select id="extraTopic" onchange="extraTopicMode()"></select></div>
-<div class="field full" id="extraManualWrap" style="display:none"><label>Konu / Görevi Kendin Yaz</label><input id="extraManualTopic" placeholder="Örn. Problemler tekrar + yanlış sorular"/></div>
-<div class="field"><label>Başlangıç Saati</label><input id="extraStart" type="time" value="18:00"/></div>
-<div class="field"><label>Bitiş Saati</label><input id="extraEnd" type="time" value="19:00"/></div>
-<div class="field"><label>Soru Hedefi</label><input id="extraQuestions" min="0" placeholder="Örn. 40" type="number"/></div>
-</div>
-<div class="modalactions">
-<button class="secondary" onclick="closeModal('extraTaskModal')">İptal</button>
-<button class="green" id="extraSaveBtn" onclick="saveExtraTask()">Ekstra Dersi Kaydet</button>
-</div>
-</div>
-</div>
+
 <style id="extraTaskWorkingStyle">
 #extraTaskModal{z-index:2147483000!important}
 #extraTaskModal.show{display:flex!important;pointer-events:auto!important}
@@ -1797,7 +1780,84 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 })();
 </script>
 
-</body></html>
+
+<script id="finalStabilityFix20260924">
+(function(){
+ const norm=v=>String(v||'').trim().toLocaleLowerCase('tr-TR');
+ const isEA=st=>String(st?.program_type||'').toUpperCase()==='YKS' && (norm(st?.field).includes('eşit')||norm(st?.field)==='ea');
+ const blockedEA=subject=>['fizik','kimya','biyoloji','fen'].some(x=>norm(subject).includes(x));
+
+ // 1) Canonical topic catalogue: EA never receives science topics.
+ const previousCatalog=window.getCatalogForStudent;
+ window.getCatalogForStudent=async function(student){
+   let rows=await previousCatalog(student);
+   try{
+     const r=await sb.from('students').select('program_type,field').eq('id',student.id).single();
+     if(!r.error && isEA(r.data)) rows=(rows||[]).filter(x=>!blockedEA(x.subject));
+   }catch(_){}
+   return rows||[];
+ };
+
+ // 2) Canonical subject list, including written-exam dropdowns.
+ const previousV185Subjects=window.v185Subjects;
+ window.v185Subjects=async function(st){
+   let full=st||{};
+   if(full.id && (!('field' in full)||!('program_type' in full))){
+     try{const r=await sb.from('students').select('program_type,exam_stage,grade,field').eq('id',full.id).single();if(!r.error)full={...full,...r.data}}catch(_){}
+   }
+   let rows=await previousV185Subjects(full);
+   return isEA(full)?(rows||[]).filter(x=>!blockedEA(x)):rows;
+ };
+ window.v185Written=async function(selected=''){
+   if(!window.activeStudentId)return;
+   const r=await sb.from('students').select('id,program_type,exam_stage,grade,field').eq('id',activeStudentId).single();
+   const subjects=r.error?[]:await window.v185Subjects(r.data||{});
+   const sel=document.getElementById('writtenSubject');if(!sel)return;
+   sel.innerHTML=(subjects||[]).map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+   sel.value=(selected&&subjects.includes(selected))?selected:(subjects[0]||'');
+ };
+ window.openWrittenExamModal=async function(){editingWrittenId=null;writtenDate.value='';await window.v185Written();document.getElementById('writtenExamModal').classList.add('show')};
+ window.editWrittenExam=async function(id,subject,date){editingWrittenId=id;writtenDate.value=date;await window.v185Written(subject);document.getElementById('writtenExamModal').classList.add('show')};
+
+ // 3) Topic status and percentage always stay consistent.
+ window.saveTopicProgress=async function(topicId,status,pct){
+   const sid=document.getElementById('topicStudent')?.value;if(!sid)return;
+   const row=(window.topicCache||[]).find(x=>String(x.id)===String(topicId));
+   let val=Math.max(0,Math.min(100,Number(pct)||0));
+   if(status==='not_started')val=0;if(status==='completed')val=100;
+   const payload={student_id:sid,topic_id:topicId,coach_id:row?.coach_id||null,status,progress_percent:val,last_studied_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+   const {error}=await sb.from('student_topic_progress').upsert(payload,{onConflict:'student_id,topic_id'});
+   if(error)return alert('Konu ilerlemesi kaydedilemedi: '+error.message);
+   await loadTopicTracking();
+ };
+
+ // 4) Student countdown follows the selected/real student's program type, never the admin list fallback.
+ window.__studentExamType='YKS';
+ async function syncStudentExamType(){
+   if(!window.activeStudentId)return window.__studentExamType;
+   try{const r=await sb.from('students').select('program_type').eq('id',activeStudentId).single();if(!r.error)window.__studentExamType=String(r.data?.program_type||'YKS').toUpperCase()==='LGS'?'LGS':'YKS'}catch(_){}
+   return window.__studentExamType;
+ }
+ window.examTypeForStudent=function(){return window.__studentExamType||'YKS'};
+ const oldRefresh=window.refreshStudentDashboard;
+ if(typeof oldRefresh==='function')window.refreshStudentDashboard=async function(){await syncStudentExamType();const out=await oldRefresh.apply(this,arguments);try{renderExamCountdowns()}catch(_){}return out};
+ const oldStudentView=window.studentView;
+ if(typeof oldStudentView==='function')window.studentView=async function(){const out=await oldStudentView.apply(this,arguments);await syncStudentExamType();try{renderExamCountdowns()}catch(_){}return out};
+
+ // Student topic entry gets the same canonical filtered catalogue.
+ const oldOpenStudentTopicEntry=window.openStudentTopicEntry;
+ if(typeof oldOpenStudentTopicEntry==='function')window.openStudentTopicEntry=async function(){
+   if(!activeStudentId)return alert('Öğrenci seçilemedi.');
+   try{
+     const catalog=await window.getCatalogForStudent({id:activeStudentId});
+     const sel=document.getElementById('steTopic');
+     sel.innerHTML=(catalog||[]).map(t=>`<option value="${t.id}">${escapeHtml(t.subject)} — ${escapeHtml(t.topic)}</option>`).join('');
+     if(!sel.options.length)return alert('Bu öğrenci için konu kataloğu bulunamadı.');
+     steQuestions.value=0;stePercent.value=10;steStatus.value='in_progress';document.getElementById('studentTopicEntryModal').classList.add('show');
+   }catch(e){alert('Konu listesi alınamadı: '+(e.message||e))}
+ };
+})();
+</script>
 <script id="v1855InfoDefinitiveFix">
 // V18.5.6 - self-contained Student Information flow.
 // No dependency on V18.5 subject catalog helpers or legacy table-cell state.
@@ -1998,3 +2058,5 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
   document.addEventListener('DOMContentLoaded',init);
 })();
 </script>
+
+</body></html>
