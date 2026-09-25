@@ -89,7 +89,7 @@ async function centerAction(type){const id=centerStudentId,row=centerRow();if(!i
  if(type==='schedule'){await openSchedule();selectByStudentId('scheduleStudent',id);return loadScheduleForStudent()}
  if(type==='topic'){await openTopicTracking();selectByStudentId('topicStudent',id);return loadTopicTracking()}
  if(type==='mock'){await openMocks();selectByStudentId('mockStudent',id);return loadMocks()}
- if(type==='written'){activeStudentId=id;await studentView(id);setTimeout(()=>document.getElementById('studentWritten')?.scrollIntoView({behavior:'smooth',block:'start'}),150);return}
+ if(type==='written'){return window.openCenterWrittenManagerSafe(id)}
  if(type==='report'){await openReports();selectByStudentId('reportStudent',id);if(typeof loadReport==='function')return loadReport()}
  if(type==='ai'){openAIPlan();const sel=document.getElementById('aiStudent');const rows=[...document.querySelectorAll('#students tr')];const idx=rows.findIndex(r=>r.dataset.id===id);if(idx>=0){sel.value=String(idx)}}
 }
@@ -1797,6 +1797,74 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 })();
 </script>
 
+
+<div class="modal" id="centerWrittenModal"><div class="modalbox" style="width:min(760px,96vw)"><div class="studentCenterHead"><div><h2 id="centerWrittenTitle" style="margin:0">📝 Yazılılar</h2><div class="studentMeta" id="centerWrittenMeta"></div></div><button class="secondary" type="button" onclick="closeModal('centerWrittenModal')">Kapat</button></div><div class="formgrid" style="margin-top:14px"><div class="field"><label>Ders</label><select id="centerWrittenSubject"></select></div><div class="field"><label>Yazılı tarihi</label><input id="centerWrittenDate" type="date"/></div></div><div class="modalactions" style="margin-top:8px"><button class="secondary" type="button" id="centerWrittenCancelEdit" style="display:none" onclick="centerWrittenCancelEditSafe()">Düzenlemeyi İptal</button><button class="primary" type="button" id="centerWrittenSaveBtn" onclick="centerWrittenSaveSafe()">+ Yazılı Ekle</button></div><div id="centerWrittenList" style="margin-top:14px">Yükleniyor…</div></div></div>
+<script id="safeNewStudentAndWrittenCenter20260925">
+(function(){
+  const FALLBACK=['Türkçe','Matematik','Geometri','Tarih','Coğrafya','Felsefe','Din Kültürü','Fizik','Kimya','Biyoloji','İngilizce'];
+  const E=id=>document.getElementById(id);
+  const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
+  const norm=v=>String(v||'').toLocaleLowerCase('tr-TR').replace(/ı/g,'i').replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ö/g,'o').replace(/ç/g,'c').trim();
+  const eaBlocked=v=>['fizik','kimya','biyoloji','fen'].some(x=>norm(v).includes(x));
+  function checked(id){return [...document.querySelectorAll('#'+id+' input:checked')].map(x=>x.value)}
+  function renderChecks(id,subjects){const el=E(id);if(!el)return;const keep=new Set(checked(id).map(norm));el.innerHTML=(subjects||[]).map(x=>`<label class="subjectCheck"><input type="checkbox" value="${esc(x)}" ${keep.has(norm(x))?'checked':''}> ${esc(x)}</label>`).join('')}
+  async function subjectList(cfg){
+    const p=String(cfg?.program_type||'').toUpperCase(),stage=String(cfg?.exam_stage||'TYT').toUpperCase().replace('YKS - ','').trim(),grade=String(cfg?.grade||'');
+    let rows=[];
+    try{
+      let q=sb.from('subject_topics').select('subject').eq('program_type',p);
+      if(p==='YKS')q=q.eq('exam_stage',stage); else if(p==='LGS')q=q.eq('grade','8'); else if(grade)q=q.eq('grade',grade);
+      const r=await q;if(!r.error)rows=[...new Set((r.data||[]).map(x=>x.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+    }catch(_){}
+    if(!rows.length)rows=[...FALLBACK];
+    if(p==='YKS'&&(norm(cfg?.field).includes('esit')||norm(cfg?.field)==='ea'))rows=rows.filter(x=>!eaBlocked(x));
+    return rows;
+  }
+  window.refreshNewStudentSubjectChecksSafe=async function(){
+    const subjects=await subjectList({program_type:E('nsProgram')?.value,exam_stage:E('nsStage')?.value,grade:E('nsGrade')?.value,field:E('nsField')?.value});
+    renderChecks('nsStrongChecks',subjects);renderChecks('nsWeakChecks',subjects);renderChecks('nsExcludedChecks',subjects);
+  };
+  const oldOpenNew=window.openNewStudent;
+  window.openNewStudent=function(){
+    if(typeof oldOpenNew==='function')oldOpenNew.apply(this,arguments);
+    setTimeout(()=>window.refreshNewStudentSubjectChecksSafe(),0);
+  };
+  ['nsProgram','nsStage','nsGrade','nsField'].forEach(id=>E(id)?.addEventListener('change',()=>window.refreshNewStudentSubjectChecksSafe()));
+  window.saveNewStudent=async function(){
+    const name=E('nsName')?.value.trim(),program_type=E('nsProgram')?.value,grade=E('nsGrade')?.value;if(!name)return alert('Ad Soyad alanını doldurun.');
+    let hours=E('nsHours')?.value===''?null:Number(E('nsHours')?.value);if(hours!==null&&(!Number.isFinite(hours)||hours<0))return alert('Günlük çalışma süresini kontrol edin.');
+    const payload={coach_id:currentProfile.id,full_name:name,grade,program_type,exam_stage:program_type==='YKS'?E('nsStage').value:null,field:program_type==='YKS'?E('nsField').value:null,target:E('nsTarget').value.trim()||null,daily_minutes:hours===null?null:Math.round(hours*60),strong_subjects:checked('nsStrongChecks').join(', ')||null,weak_subjects:checked('nsWeakChecks').join(', ')||null,excluded_subjects:checked('nsExcludedChecks'),coach_notes:E('nsNote').value.trim()||null,school_status:E('nsSchoolStatus').value};
+    const {error}=await sb.from('students').insert(payload);if(error)return alert('Öğrenci eklenemedi: '+error.message);closeModal('newStudentModal');await loadCloudStudents();
+  };
+
+  let writtenStudentId=null,writtenEditId=null;
+  async function refreshWrittenSubjects(selected=''){
+    const r=await sb.from('students').select('program_type,exam_stage,grade,field').eq('id',writtenStudentId).single();if(r.error)return;
+    const a=await subjectList(r.data||{}),sel=E('centerWrittenSubject');sel.innerHTML=a.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');sel.value=(selected&&a.includes(selected))?selected:(a[0]||'');
+  }
+  async function refreshWrittenList(){
+    const box=E('centerWrittenList');if(!box||!writtenStudentId)return;
+    const {data,error}=await sb.from('written_exams').select('id,subject,exam_date').eq('student_id',writtenStudentId).order('exam_date',{ascending:true});
+    if(error){box.innerHTML='<div class="empty">'+esc(error.message)+'</div>';return}
+    box.innerHTML=(data||[]).length?(data||[]).map(x=>`<div class="examListItem"><span><b>${esc(x.subject)}</b><br><small>${esc(x.exam_date)}</small></span><span><button class="secondary small" type="button" onclick="centerWrittenEditSafe('${esc(x.id)}','${esc(x.subject)}','${esc(x.exam_date)}')">Düzenle</button> <button class="danger small" type="button" onclick="centerWrittenDeleteSafe('${esc(x.id)}')">Sil</button></span></div>`).join(''):'<div class="empty">Henüz yazılı tarihi eklenmemiş.</div>';
+  }
+  window.openCenterWrittenManagerSafe=async function(id){
+    writtenStudentId=id;window.activeStudentId=id;writtenEditId=null;
+    const {data,error}=await sb.from('students').select('full_name,school_status').eq('id',id).single();if(error)return alert('Öğrenci bilgisi alınamadı: '+error.message);if(data?.school_status==='graduate')return alert('Mezun öğrenciler için yazılı takvimi kullanılmaz.');
+    closeModal('studentCenterModal');E('centerWrittenTitle').textContent='📝 '+(data?.full_name||'Öğrenci')+' Yazılıları';E('centerWrittenDate').value='';E('centerWrittenSaveBtn').textContent='+ Yazılı Ekle';E('centerWrittenCancelEdit').style.display='none';await refreshWrittenSubjects();await refreshWrittenList();E('centerWrittenModal').classList.add('show');
+  };
+  window.centerWrittenSaveSafe=async function(){
+    if(!writtenStudentId)return;const subject=E('centerWrittenSubject').value,date=E('centerWrittenDate').value;if(!subject||!date)return alert('Ders ve tarih zorunludur.');
+    let error=null;
+    if(writtenEditId){({error}=await sb.from('written_exams').update({subject,exam_date:date,updated_at:new Date().toISOString()}).eq('id',writtenEditId));}
+    else{const st=await sb.from('students').select('coach_id').eq('id',writtenStudentId).single();if(st.error)return alert(st.error.message);({error}=await sb.from('written_exams').insert({student_id:writtenStudentId,coach_id:st.data?.coach_id,subject,exam_date:date,created_by:currentProfile.id}));}
+    if(error)return alert('Yazılı kaydedilemedi: '+error.message);writtenEditId=null;E('centerWrittenDate').value='';E('centerWrittenSaveBtn').textContent='+ Yazılı Ekle';E('centerWrittenCancelEdit').style.display='none';await refreshWrittenList();
+  };
+  window.centerWrittenEditSafe=async function(id,subject,date){writtenEditId=id;await refreshWrittenSubjects(subject);E('centerWrittenDate').value=date;E('centerWrittenSaveBtn').textContent='Değişikliği Kaydet';E('centerWrittenCancelEdit').style.display='inline-block'};
+  window.centerWrittenCancelEditSafe=function(){writtenEditId=null;E('centerWrittenDate').value='';E('centerWrittenSaveBtn').textContent='+ Yazılı Ekle';E('centerWrittenCancelEdit').style.display='none'};
+  window.centerWrittenDeleteSafe=async function(id){if(!confirm('Bu yazılı tarihi silinsin mi?'))return;const {error}=await sb.from('written_exams').delete().eq('id',id);if(error)return alert('Yazılı silinemedi: '+error.message);await refreshWrittenList()};
+})();
+</script>
 </body></html>
 <!-- FINAL_STABILITY_FIX_20260924 -->
 <script id="finalStabilityFix20260924">
@@ -2057,19 +2125,27 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
       const key=[d,ns,norm(t.topic)].join('|');if(seen.has(key))continue;seen.add(key);used[d].push({a,b});out.push({plan_id:planId,student_id:student.id,task_date:d,start_time:st,end_time:en,subject:subj,topic:String(t.topic||''),description:String(t.description||''),target_questions:Number.isFinite(+t.target_questions)?+t.target_questions:null,status:'pending'});
     }return out;
   };
-  // Student Information saves student information only; weekly exclusions are intentionally untouched.
+  // Student Information saves the personal exam date separately so coach_id is never overwritten by an empty value.
   window.saveInfo=async function(){
     const id=window.activeStudentId;if(!id)return alert('Öğrenci seçilemedi.');
     const v=id=>document.getElementById(id), picked=id=>[...document.querySelectorAll('#'+id+' input[type="checkbox"]:checked')].map(x=>x.value);
     const raw=v('infoHours')?.value??'',hours=raw===''?null:Number(raw);if(hours!==null&&(!Number.isFinite(hours)||hours<0))return alert('Günlük çalışma süresini kontrol edin.');
     const strong=picked('infoStrongChecks'),weak=picked('infoWeakChecks'),overlap=strong.filter(x=>weak.includes(x));if(overlap.length)return alert('Aynı ders hem Güçlü hem Eksik seçilemez: '+overlap.join(', '));
-    const payload={target:v('infoGoal')?.value.trim()||null,daily_minutes:hours===null?null:Math.round(hours*60),strong_subjects:strong.join(', ')||null,weak_subjects:weak.join(', ')||null,coach_notes:v('infoNote')?.value.trim()||null,school_status:v('infoSchoolStatus')?.value||'school',student_phone:v('infoStudentPhone')?.value.trim()||null,parent_name:v('infoParentName')?.value.trim()||null,parent_phone:v('infoParentPhone')?.value.trim()||null,exam_date:v('infoExamDate')?.value||null,updated_at:new Date().toISOString()};
+    const examDate=v('infoExamDate')?.value||null;
+    const payload={target:v('infoGoal')?.value.trim()||null,daily_minutes:hours===null?null:Math.round(hours*60),strong_subjects:strong.join(', ')||null,weak_subjects:weak.join(', ')||null,coach_notes:v('infoNote')?.value.trim()||null,school_status:v('infoSchoolStatus')?.value||'school',student_phone:v('infoStudentPhone')?.value.trim()||null,parent_name:v('infoParentName')?.value.trim()||null,parent_phone:v('infoParentPhone')?.value.trim()||null,updated_at:new Date().toISOString()};
+    const selectedCoach=v('infoCoach')?.value||'';if(selectedCoach)payload.coach_id=selectedCoach;
+    const b=document.querySelector('#infoModal .modalactions button.green');
     try{
-      const current=await sb.from('students').select('coach_id').eq('id',id).single();if(current.error)throw current.error;
-      const selectedCoach=v('infoCoach')?.value||'';payload.coach_id=selectedCoach||current.data?.coach_id;if(!payload.coach_id)throw new Error('Öğrencinin eğitim koçu bulunamadı.');
-      const b=document.querySelector('#infoModal .modalactions button.green');if(b){b.disabled=true;b.textContent='Kaydediliyor…'}const r=await sb.from('students').update(payload).eq('id',id);if(r.error)throw r.error;alert('Öğrenci bilgileri kaydedildi.');document.getElementById('infoModal')?.classList.remove('show');if(typeof loadCloudStudents==='function')await loadCloudStudents();}
-    catch(e){alert('Bilgiler kaydedilemedi: '+(e?.message||e))}finally{const b=document.querySelector('#infoModal .modalactions button.green');if(b){b.disabled=false;b.textContent='Kaydet'}}
+      if(b){b.disabled=true;b.textContent='Kaydediliyor…'}
+      const r=await sb.from('students').update(payload).eq('id',id);if(r.error)throw r.error;
+      const dateResult=await sb.from('students').update({exam_date:examDate,updated_at:new Date().toISOString()}).eq('id',id);if(dateResult.error)throw dateResult.error;
+      window.dispatchEvent(new CustomEvent('student-exam-date-updated',{detail:{studentId:id,examDate}}));
+      alert('Öğrenci bilgileri kaydedildi.');document.getElementById('infoModal')?.classList.remove('show');if(typeof loadCloudStudents==='function')await loadCloudStudents();
+    }catch(e){alert('Bilgiler kaydedilemedi: '+(e?.message||e))}finally{if(b){b.disabled=false;b.textContent='Kaydet'}}
   };
+  // Ensure the Bilgileri Düzenle Kaydet button uses the final safe saveInfo implementation, not the older legacy handler.
+  const infoSaveBtn=document.querySelector('#infoModal .modalactions button.green');
+  if(infoSaveBtn)infoSaveBtn.onclick=window.saveInfo;
   function init(){
     document.querySelectorAll('#infoExcludedChecks,#nsExcludedChecks').forEach(x=>{const f=x.closest('.field');if(f)f.style.display='none'});
     const toolbar=document.querySelector('#scheduleModal .scheduleToolbar');if(toolbar&&!document.getElementById('weeklyRuleBox')){const d=document.createElement('div');d.id='weeklyRuleBox';d.className='weekRuleBox';toolbar.insertAdjacentElement('afterend',d)}
@@ -2218,6 +2294,10 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
     ensurePersonalExamUI();
     if(window.activeStudentId && activeStudentId!==lastStudent){lastStudent=activeStudentId;personalExamDateStudent=null;personalExamDateCache=null;refreshPersonalStudentExamDate()}
   },800);
+  window.addEventListener('student-exam-date-updated',function(ev){
+    const d=ev?.detail||{};if(!d.studentId||d.studentId!==window.activeStudentId)return;
+    personalExamDateStudent=d.studentId;personalExamDateCache=d.examDate||'';paintPersonalStudentCountdown(personalExamDateCache);
+  });
   document.addEventListener('DOMContentLoaded',ensurePersonalExamUI);
 })();
 </script>
