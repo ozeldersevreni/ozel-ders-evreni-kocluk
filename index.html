@@ -2313,3 +2313,94 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
  tick();setInterval(tick,1000);
 })();
 </script>
+
+
+<style id="studentClockNoCountdown20260925">
+/* Requested final simplification: no exam countdown/date controls; show live clock on student panel too. */
+#studentCountdown{display:none!important}
+#personalStudentExamDateModal{display:none!important}
+#infoModal .field:has(#infoExamDate){display:none!important}
+#studentLiveClockPanel{display:flex;align-items:center;justify-content:center;min-height:150px}
+#studentLiveClockPanel .liveClockInner{text-align:center;width:100%;padding:18px 10px}
+#studentLiveDate{font-size:24px;font-weight:800;line-height:1.3}
+#studentLiveTime{font-size:42px;font-weight:900;line-height:1.2;margin-top:6px}
+</style>
+<script id="studentClockNoCountdownLogic20260925">
+(function(){
+  function ensureStudentClock(){
+    if(document.getElementById('studentLiveClockPanel')) return;
+    const old=document.getElementById('studentCountdown');
+    if(!old||!old.parentNode) return;
+    const panel=document.createElement('div');
+    panel.className='countdownPanel';
+    panel.id='studentLiveClockPanel';
+    panel.innerHTML='<div class="liveClockInner"><div id="studentLiveDate">—</div><div id="studentLiveTime">--:--</div></div>';
+    old.parentNode.insertBefore(panel,old);
+  }
+  function tickStudentClock(){
+    ensureStudentClock();
+    const d=new Date(),date=document.getElementById('studentLiveDate'),time=document.getElementById('studentLiveTime');
+    if(date) date.textContent=new Intl.DateTimeFormat('tr-TR',{day:'numeric',month:'long',year:'numeric',weekday:'long'}).format(d);
+    if(time) time.textContent=new Intl.DateTimeFormat('tr-TR',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(d);
+  }
+
+  // Final Student Information save: exam date is intentionally not part of this form anymore.
+  // Keep the student's existing coach assignment unless an admin explicitly chooses another coach.
+  async function saveInfoWithoutExamDate(){
+    const id=window.activeStudentId;
+    if(!id) return alert('Öğrenci seçilemedi. Bilgiler ekranını kapatıp tekrar açın.');
+    const v=x=>document.getElementById(x);
+    const picked=x=>[...document.querySelectorAll('#'+x+' input[type="checkbox"]:checked')].map(el=>el.value);
+    const raw=v('infoHours')?.value??'',hours=raw===''?null:Number(raw);
+    if(hours!==null&&(!Number.isFinite(hours)||hours<0)) return alert('Günlük çalışma süresini kontrol edin.');
+    const strong=picked('infoStrongChecks'),weak=picked('infoWeakChecks');
+    const overlap=strong.filter(x=>weak.includes(x));
+    if(overlap.length) return alert('Aynı ders hem Güçlü hem Eksik seçilemez: '+overlap.join(', '));
+    const payload={
+      target:v('infoGoal')?.value.trim()||null,
+      daily_minutes:hours===null?null:Math.round(hours*60),
+      strong_subjects:strong.join(', ')||null,
+      weak_subjects:weak.join(', ')||null,
+      coach_notes:v('infoNote')?.value.trim()||null,
+      school_status:v('infoSchoolStatus')?.value||'school',
+      student_phone:v('infoStudentPhone')?.value.trim()||null,
+      parent_name:v('infoParentName')?.value.trim()||null,
+      parent_phone:v('infoParentPhone')?.value.trim()||null,
+      updated_at:new Date().toISOString()
+    };
+    if(currentProfile?.role==='admin'){
+      const selected=v('infoCoach')?.value||'';
+      if(selected) payload.coach_id=selected;
+      else {
+        const existing=await sb.from('students').select('coach_id').eq('id',id).single();
+        if(existing.error) return alert('Öğrenci bilgisi okunamadı: '+existing.error.message);
+        if(existing.data?.coach_id) payload.coach_id=existing.data.coach_id;
+      }
+    }
+    const btn=document.querySelector('#infoModal .modalactions button.green');
+    try{
+      if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+      const r=await sb.from('students').update(payload).eq('id',id);
+      if(r.error) throw r.error;
+      alert('Öğrenci bilgileri kaydedildi.');
+      document.getElementById('infoModal')?.classList.remove('show');
+      if(typeof loadCloudStudents==='function') await loadCloudStudents();
+    }catch(e){
+      alert('Bilgiler kaydedilemedi: '+(e?.message||e));
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='Kaydet';}
+    }
+  }
+
+  window.saveInfo=saveInfoWithoutExamDate;
+  function wire(){
+    const btn=document.querySelector('#infoModal .modalactions button.green');
+    if(btn) btn.onclick=saveInfoWithoutExamDate;
+    const examField=document.getElementById('infoExamDate')?.closest('.field');
+    if(examField) examField.style.display='none';
+    tickStudentClock();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',wire); else wire();
+  setInterval(tickStudentClock,1000);
+})();
+</script>
