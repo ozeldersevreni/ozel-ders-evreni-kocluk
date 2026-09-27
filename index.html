@@ -3059,3 +3059,65 @@ button[onclick*="openTopicTracking"],button[onclick*="openStudentTopicTracking"]
 })();
 </script>
 
+
+
+<style id="teacherTopicStatusReadOnlyStyle20260927">
+#teacherTopicStatusReadOnly20260927{margin-top:14px;padding:14px;border:1px solid #e6ebf2;border-radius:14px;background:#f8fbff}
+#teacherTopicStatusReadOnly20260927 h3{margin:0 0 10px;font-size:17px}
+.teacherTopicStatusRow{display:grid;grid-template-columns:minmax(120px,.7fr) minmax(220px,1.7fr) auto;gap:12px;align-items:center;padding:10px 4px;border-top:1px solid #e9edf3}
+.teacherTopicStatusRow:first-of-type{border-top:0}
+.teacherTopicStatusRow b{color:#102a56}
+.teacherTopicStatusBadge{white-space:nowrap;font-weight:800;color:#1769e0}
+@media(max-width:700px){.teacherTopicStatusRow{grid-template-columns:1fr;gap:3px}}
+</style>
+<script id="teacherTopicStatusReadOnlyScript20260927">
+(function(){
+ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const statusLabel=s=>{
+   const v=String(s||'').toLowerCase();
+   if(v==='completed'||v==='tamamlandı'||v==='tamamlandi')return 'Tamamlandı';
+   if(v==='working'||v==='in_progress'||v==='çalışıyor'||v==='calisiyor')return 'Çalışıyor';
+   if(v==='review'||v==='review_needed'||v.includes('tekrar'))return 'Tekrar Gerekli';
+   return s||'Başlanmadı';
+ };
+ async function renderTeacherTopicStatus(studentId){
+   if(!studentId || !currentProfile || !['admin','coach'].includes(currentProfile.role))return;
+   const modal=document.getElementById('studentCenterModal');
+   if(!modal)return;
+   let box=document.getElementById('teacherTopicStatusReadOnly20260927');
+   if(!box){
+     box=document.createElement('section');box.id='teacherTopicStatusReadOnly20260927';
+     const host=modal.querySelector('.modalBox,.modal-content,.modalContent')||modal.firstElementChild||modal;
+     host.appendChild(box);
+   }
+   box.innerHTML='<h3>📚 Konu Durumu</h3><div>Yükleniyor…</div>';
+   const pr=await sb.from('student_topic_progress')
+     .select('topic_id,status,progress_percent')
+     .eq('student_id',studentId);
+   if(pr.error){box.innerHTML='<h3>📚 Konu Durumu</h3><div>Konu durumu alınamadı.</div>';return}
+   const rows=(pr.data||[]).filter(x=>Number(x.progress_percent||0)>0 || (x.status && !['not_started','Başlanmadı'].includes(x.status)));
+   if(!rows.length){box.innerHTML='<h3>📚 Konu Durumu</h3><div class="empty">Öğrencinin kayıtlı konu durumu yok.</div>';return}
+   const ids=[...new Set(rows.map(x=>x.topic_id).filter(Boolean))];
+   let topics=[];
+   if(ids.length){
+     const tr=await sb.from('subject_topics').select('id,subject,topic').in('id',ids);
+     if(!tr.error)topics=tr.data||[];
+   }
+   const byId=new Map(topics.map(x=>[String(x.id),x]));
+   box.innerHTML='<h3>📚 Konu Durumu</h3>'+rows.map(x=>{
+     const t=byId.get(String(x.topic_id))||{};
+     const pct=Math.max(0,Math.min(100,Number(x.progress_percent||0)));
+     return `<div class="teacherTopicStatusRow"><b>${esc(t.subject||'Ders')}</b><span>${esc(t.topic||'Konu')}</span><span class="teacherTopicStatusBadge">%${pct} • ${esc(statusLabel(x.status))}</span></div>`;
+   }).join('');
+ }
+ const oldOpen=window.openStudentCenter;
+ if(typeof oldOpen==='function'){
+   window.openStudentCenter=async function(id){
+     const r=await oldOpen.apply(this,arguments);
+     await renderTeacherTopicStatus(id);
+     return r;
+   };
+ }
+})();
+</script>
+
