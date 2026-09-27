@@ -2728,3 +2728,71 @@ window.onload=function(){
 })();
 </script>
 
+
+
+<style id="weeklyProgressTeacherFixStyle">
+#students .progress{cursor:pointer;position:relative;min-width:90px}
+#students .progress:after{content:"Aç";position:absolute;right:5px;top:-4px;font-size:10px;font-weight:700;color:#1769e0}
+</style>
+<script id="weeklyProgressTeacherFix20260927">
+(function(){
+  // Öğretmen/yönetici öğrenci listesindeki haftalık ilerleme çubuğuna tıklayınca,
+  // doğrudan aynı öğrencinin BU HAFTA programını açar.
+  document.addEventListener('click', async function(e){
+    const progress=e.target.closest && e.target.closest('#students .progress');
+    if(!progress)return;
+    const row=progress.closest('tr[data-id]');
+    const sid=row && row.dataset.id;
+    if(!sid)return;
+    try{
+      scheduleWeekOffset=0;
+      document.getElementById('scheduleModal')?.classList.add('show');
+      const sel=document.getElementById('scheduleStudent');
+      const box=document.getElementById('scheduleContent');
+      if(box)box.textContent='Haftalık ilerleme yükleniyor…';
+
+      // Yetki kapsamındaki öğrencileri mevcut güvenli fonksiyonla doldur.
+      if(typeof fillFeatureStudents==='function'){
+        await fillFeatureStudents('scheduleStudent');
+      }
+      if(!sel)return;
+      const exists=[...sel.options].some(o=>String(o.value)===String(sid));
+      if(!exists){
+        if(box)box.innerHTML='<b>Bu öğrenci öğretmenin erişim kapsamında değil.</b>';
+        return;
+      }
+      sel.value=sid;
+      await loadScheduleForStudent();
+    }catch(err){
+      if(document.getElementById('scheduleContent'))
+        document.getElementById('scheduleContent').textContent='Haftalık ilerleme açılamadı: '+(err?.message||err);
+    }
+  });
+
+  // İlerleme yüzdesi her yenilendiğinde tamamlanan görevleri study_tasks.status üzerinden hesapla.
+  window.refreshAllStudentProgress=async function(){
+    const rows=[...document.querySelectorAll('#students tr[data-id]')];
+    const week=mondayISO(), end=addDaysISO(week,6);
+    for(const r of rows){
+      const id=r.dataset.id;if(!id)continue;
+      const {data,error}=await sb.from('study_tasks')
+        .select('status')
+        .eq('student_id',id)
+        .gte('task_date',week)
+        .lte('task_date',end);
+      if(error)continue;
+      const a=data||[];
+      const done=a.filter(x=>String(x.status||'').trim().toLowerCase()==='completed').length;
+      const pct=a.length?Math.round(done*100/a.length):0;
+      const bar=r.querySelector('.progress i');
+      const wrap=r.querySelector('.progress');
+      if(bar)bar.style.width=pct+'%';
+      if(wrap){
+        wrap.title=`Haftalık ilerleme: %${pct} • ${done}/${a.length} tamamlandı — açmak için tıkla`;
+        wrap.setAttribute('aria-label',wrap.title);
+      }
+    }
+  };
+})();
+</script>
+
