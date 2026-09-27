@@ -2945,3 +2945,117 @@ button[onclick*="openTopicTracking"],button[onclick*="openStudentTopicTracking"]
 })();
 </script>
 
+
+
+<style id="welcomeAndCompactOpenFinal20260927">
+/* Öğretmen/yönetici: ilerleme + yüzde + küçük Aç aynı satır */
+#students td:nth-child(6){
+  min-width:245px!important;width:245px!important;
+  white-space:nowrap!important;
+}
+#students td:nth-child(6) .progress{
+  display:inline-block!important;
+  vertical-align:middle!important;
+  width:120px!important;min-width:120px!important;height:12px!important;
+  margin:0 7px 0 0!important;
+}
+#students td:nth-child(6) .weekly-progress-pct{
+  display:inline-block!important;vertical-align:middle!important;
+  margin:0 7px 0 0!important;min-width:30px!important;
+}
+#students td:nth-child(6) .weekly-open-btn{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  vertical-align:middle!important;
+  min-width:auto!important;width:auto!important;height:32px!important;
+  padding:0 10px!important;margin:0!important;border-radius:9px!important;
+  font-size:12px!important;line-height:1!important;
+}
+
+/* Öğrenci: başlığın hemen altında sade karşılama satırı */
+#studentWelcomeFinal20260927{
+  margin:4px 0 14px!important;padding:10px 14px!important;
+  border-radius:12px!important;background:#eef5ff!important;
+  color:#102a56!important;font-size:16px!important;font-weight:800!important;
+}
+#studentWelcomeFinal20260927 small{
+  font-size:13px!important;font-weight:600!important;color:#5c6b82!important;margin-left:7px;
+}
+</style>
+<script id="welcomeAndCompactOpenFinalScript20260927">
+(function(){
+ function compactOpenButtons(){
+   document.querySelectorAll('#students tr[data-id]').forEach(function(row){
+     const cell=row.querySelector('td:nth-child(6)');
+     if(!cell)return;
+     const progress=cell.querySelector('.progress');
+     if(!progress)return;
+
+     let pct=cell.querySelector('.weekly-progress-pct');
+     if(!pct){
+       pct=document.createElement('span');
+       pct.className='weekly-progress-pct';
+       progress.after(pct);
+     }
+     const n=parseFloat((progress.querySelector('i')?.style.width||'0').replace('%',''));
+     pct.textContent='%'+(Number.isFinite(n)?Math.round(n):0);
+
+     let btn=cell.querySelector('.weekly-open-btn');
+     if(!btn){
+       btn=document.createElement('button');
+       btn.type='button'; btn.className='weekly-open-btn'; btn.innerHTML='👁&nbsp; Aç';
+       btn.addEventListener('click',function(ev){ev.stopPropagation();progress.click()});
+       pct.after(btn);
+     }
+   });
+ }
+
+ function addWelcome(){
+   const student=document.getElementById('student');
+   if(!student || !student.classList.contains('show'))return;
+   let name='';
+   const info=[...student.querySelectorAll('h1,h2,h3,p,div')].find(function(el){
+     const t=(el.textContent||'').trim();
+     return /•\s*\d+\.\s*sınıf/i.test(t) || /•\s*(YKS|LGS|ARA)/i.test(t);
+   });
+   if(info){
+     name=(info.textContent||'').split('•')[0].trim();
+   }
+   if(!name){
+     const row=document.querySelector('#students tr[data-id]');
+     name=(row?.querySelector('td')?.textContent||'').trim();
+   }
+   if(!name)name='Öğrenci';
+
+   let welcome=document.getElementById('studentWelcomeFinal20260927');
+   if(!welcome){
+     welcome=document.createElement('div');
+     welcome.id='studentWelcomeFinal20260927';
+     const clock=[...student.querySelectorAll('div,section')].find(el=>{
+       const t=(el.textContent||'');
+       return /\d{1,2}:\d{2}:\d{2}/.test(t) && /2026|2027|2028/.test(t);
+     });
+     if(clock && clock.parentNode) clock.parentNode.insertBefore(welcome,clock);
+     else student.prepend(welcome);
+   }
+   welcome.innerHTML='👋 Hoş geldin, '+String(name).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))+
+     '<small>Bugünkü programın seni bekliyor.</small>';
+ }
+
+ const oldProgress=window.refreshAllStudentProgress;
+ if(typeof oldProgress==='function'){
+   window.refreshAllStudentProgress=async function(){
+     const r=await oldProgress.apply(this,arguments);
+     compactOpenButtons(); return r;
+   };
+ }
+ const oldStudent=window.refreshStudentDashboard;
+ if(typeof oldStudent==='function'){
+   window.refreshStudentDashboard=async function(){
+     const r=await oldStudent.apply(this,arguments);
+     addWelcome(); return r;
+   };
+ }
+ window.addEventListener('load',function(){setTimeout(function(){compactOpenButtons();addWelcome()},500)});
+})();
+</script>
+
