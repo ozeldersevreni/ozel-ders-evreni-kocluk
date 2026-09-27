@@ -656,7 +656,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <script id="v182-definitive-program-fix">
 // V18.2 — definitive weekly program generator. This final override deliberately
 // does not depend on the legacy examDatesCache variable or earlier generator wrappers.
-window.__APP_BUILD='V18.7-QUEUE';
+window.__APP_BUILD='V20.1-MUFREDAT-MOBIL';
 async function getMainExamDateForProgram(programType){
   try{
     const key=programType==='LGS'?'LGS_EXAM_DATE':'YKS_EXAM_DATE';
@@ -701,7 +701,7 @@ window.generateAIPlan=async function(){
       else if(fld.includes('eşit')) scopes=['SAY_EA','EA_SOZ'];
       else if(fld.includes('söz')) scopes=['EA_SOZ','SOZ'];
     }
-    let cq=sb.from('subject_topics').select('id,subject,topic,program_type,exam_stage,field_scope,grade').eq('program_type',st.program_type);
+    let cq=sb.from('subject_topics').select('id,subject,topic,program_type,exam_stage,field_scope,grade,sort_order').eq('program_type',st.program_type);
     if(st.program_type==='YKS') cq=cq.eq('exam_stage',stage).in('field_scope',scopes);
     else if(st.program_type==='LGS') cq=cq.eq('grade','8');
     else cq=cq.eq('grade',String(st.grade));
@@ -711,10 +711,53 @@ window.generateAIPlan=async function(){
     if(st.program_type==='YKS' && (fld.includes('eşit')||fld==='ea')){
       for(const fen of ['Fizik','Kimya','Biyoloji']) if(!effectiveExcluded.map(v185Norm).includes(v185Norm(fen))) effectiveExcluded.push(fen);
     }
-    data.allowed_topics=(cat.data||[]).filter(x=>!effectiveExcluded.map(v185Norm).includes(v185Norm(x.subject))).map(x=>({id:x.id,subject:x.subject,topic:x.topic}));data.excluded_subjects=effectiveExcluded;st.__effective_excluded_subjects=effectiveExcluded;st.__allowed_subjects=[...new Set(data.allowed_topics.map(x=>x.subject))];
+    const curriculumTopics=(cat.data||[])
+      .filter(x=>!effectiveExcluded.map(v185Norm).includes(v185Norm(x.subject)))
+      .map(x=>({id:x.id,subject:x.subject,topic:x.topic,sort_order:Number.isFinite(Number(x.sort_order))?Number(x.sort_order):999999}));
+    data.excluded_subjects=effectiveExcluded;
+    st.__effective_excluded_subjects=effectiveExcluded;
+    st.__allowed_subjects=[...new Set(curriculumTopics.map(x=>x.subject))];
     const prog=await sb.from('student_topic_progress').select('topic_id,progress_percent,status,questions_solved,last_exam_percent,ai_note,coach_note').eq('student_id',sid);
     if(prog.error) throw prog.error;
     data.topic_progress=prog.data||[];
+
+    // V20.1 — Yıllık müfredatı bir haftaya sıkıştırma. Her ders için mevcut/tekrar gereken
+    // konuları ve sıradaki yalnızca bir yeni konuyu AI'ye aç. Böylece haftalık program,
+    // yıllık konu sırasından küçük ve gerçekçi bir kesit olarak ilerler.
+    const progressMap=new Map((data.topic_progress||[]).map(x=>[String(x.topic_id),x]));
+    const bySubject=new Map();
+    for(const t of curriculumTopics){
+      const k=String(t.subject||'');
+      if(!bySubject.has(k))bySubject.set(k,[]);
+      bySubject.get(k).push(t);
+    }
+    const weeklyTopics=[];
+    for(const rows0 of bySubject.values()){
+      const rows=[...rows0].sort((a,b)=>(a.sort_order-b.sort_order)||String(a.topic||'').localeCompare(String(b.topic||''),'tr'));
+      const chosen=new Set();
+      // Önce yarım kalan / tekrar gereken konular.
+      for(const t of rows){
+        const p=progressMap.get(String(t.id));
+        if(p && (p.status==='in_progress'||p.status==='review_needed')){
+          weeklyTopics.push(t);chosen.add(String(t.id));
+          if(chosen.size>=2)break;
+        }
+      }
+      // Sonra müfredat sırasındaki ilk tamamlanmamış yeni konu.
+      const next=rows.find(t=>{
+        if(chosen.has(String(t.id)))return false;
+        const p=progressMap.get(String(t.id));
+        return !(p && (p.status==='completed'||Number(p.progress_percent)>=100));
+      });
+      if(next){weeklyTopics.push(next);chosen.add(String(next.id));}
+    }
+    data.allowed_topics=(weeklyTopics.length?weeklyTopics:curriculumTopics.slice(0,Math.min(curriculumTopics.length,12)))
+      .map(x=>({id:x.id,subject:x.subject,topic:x.topic}));
+    const userInstruction=document.getElementById('aiInstruction')?.value.trim()||'';
+    data.coach_instruction=[
+      'YILLIK MÜFREDAT KURALI: Bu sadece 1 haftalık plandır. Yıllık müfredatın tamamını veya çok sayıda yeni konuyu bu haftaya sıkıştırma. allowed_topics bu hafta için müfredat sırasından seçilmiş mevcut/tekrar/sıradaki konulardır. Aynı konu birkaç güne bölünebilir; konu anlatımı, pekiştirme ve soru çözümü ayrı görevler olabilir. Tamamlanan konulara gereksiz yere geri dönme.',
+      userInstruction?('KOÇUN EK TALİMATI: '+userInstruction):''
+    ].filter(Boolean).join('\n');
 
     const {data:sessionData,error:sessionError}=await sb.auth.getSession();
     if(sessionError)throw sessionError;
@@ -1703,7 +1746,8 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 
 <style id="v190ManualPlanStyles">
 .manualPlanChoice{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0;padding:12px;background:#f6f8fc;border-radius:12px}
-.manualPlanGrid{display:grid;grid-template-columns:1fr 1.2fr;gap:14px}.manualHistory{max-height:430px;overflow:auto;border:1px solid #e4e9f2;border-radius:12px;padding:10px;background:#fafcff}.manualHistoryItem{padding:9px 10px;border-bottom:1px solid #edf1f6;font-size:13px}.manualHistoryItem:last-child{border-bottom:0}.manualHistoryItem b{display:block;margin-bottom:3px}.manualMeta{color:#5d6b82;font-size:12px}.manualProgress{font-weight:800}.manualForm{display:grid;grid-template-columns:1fr 1fr;gap:10px}.manualForm .full{grid-column:1/-1}.manualNotice{padding:10px 12px;background:#eef7ff;border:1px solid #cfe5ff;border-radius:10px;font-size:13px;margin-bottom:10px}@media(max-width:800px){.manualPlanGrid{grid-template-columns:1fr}.manualForm{grid-template-columns:1fr}.manualForm .full{grid-column:auto}}
+.manualPlanGrid{display:grid;grid-template-columns:1fr 1.2fr;gap:14px}.manualHistory{max-height:430px;overflow:auto;border:1px solid #e4e9f2;border-radius:12px;padding:10px;background:#fafcff}.manualHistoryItem{padding:9px 10px;border-bottom:1px solid #edf1f6;font-size:13px}.manualHistoryItem:last-child{border-bottom:0}.manualHistoryItem b{display:block;margin-bottom:3px}.manualMeta{color:#5d6b82;font-size:12px}.manualProgress{font-weight:800}.manualForm{display:grid;grid-template-columns:1fr 1fr;gap:10px}.manualForm .full{grid-column:1/-1}.manualNotice{padding:10px 12px;background:#eef7ff;border:1px solid #cfe5ff;border-radius:10px;font-size:13px;margin-bottom:10px}.manualTopicTapList{display:none}
+@media(max-width:800px){.manualPlanGrid{grid-template-columns:1fr}.manualForm{grid-template-columns:1fr}.manualForm .full{grid-column:auto}#manualTopic{display:none}.manualTopicTapList{display:grid;grid-template-columns:1fr;gap:8px;max-height:260px;overflow:auto;padding:6px 2px;-webkit-overflow-scrolling:touch}.manualTopicTapBtn{display:block;width:100%;min-height:48px;text-align:left;border:1px solid #d8e0ea;border-radius:10px;background:#fff;color:#25364d;padding:11px 12px;font-weight:700;touch-action:manipulation}.manualTopicTapBtn.active{border-color:#1769e0;background:#eaf2ff;color:#0f5fc8}}
 </style>
 <div class="modal" id="manualPlanModal" style="z-index:2147483200">
  <div class="modalbox" style="width:min(1050px,96vw);max-height:92vh;overflow:auto">
@@ -1720,7 +1764,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
     <div class="manualForm">
      <div class="field"><label>Gün</label><select id="manualDay"></select></div>
      <div class="field"><label>Ders</label><select id="manualSubject" onchange="manualLoadTopics()"></select></div>
-     <div class="field full"><label>Konu</label><select id="manualTopic" onchange="manualTopicChanged()"></select></div>
+     <div class="field full"><label>Konu</label><select id="manualTopic" onchange="manualTopicChanged()"></select><div id="manualTopicTapList" class="manualTopicTapList" aria-label="Konu seçimi"></div></div>
      <div class="field"><label>Başlangıç</label><input id="manualStart" type="time" value="18:00"></div>
      <div class="field"><label>Bitiş</label><input id="manualEnd" type="time" value="19:00"></div>
      <div class="field"><label>Soru hedefi</label><input id="manualQuestions" type="number" min="0" placeholder="Örn. 40"></div>
@@ -1781,8 +1825,9 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
    }catch(e){box.textContent='Bilgiler alınamadı.';alert('Elle program ekranı açılamadı: '+(e?.message||e))}
  };
  window.renderManualHistory=function(){if(!ctx)return;const f=document.getElementById('manualHistorySubject').value;const rows=ctx.catalog.filter(x=>!f||x.subject===f);document.getElementById('manualHistory').innerHTML=rows.length?rows.map(x=>{const p=topicProgress(x.id),h=topicHistory(x.subject,x.topic),pct=p?.progress_percent||0,status=p?.status==='completed'?'✓ Tamamlandı':p?.status==='review_needed'?'↻ Tekrar gerekli':p?.status==='in_progress'?'▶ Çalışılıyor':'Başlanmadı';return '<div class="manualHistoryItem"><b>'+esc(x.subject)+' — '+esc(x.topic)+'</b><span class="manualProgress">%'+pct+'</span> • '+status+'<div class="manualMeta">'+(h?'Daha önce programlandı • Son: '+fmtDate(h.task_date):'Henüz programa verilmedi')+'</div></div>'}).join(''):'Bu filtrede konu bulunamadı.'};
- window.manualLoadTopics=function(){if(!ctx)return;const s=document.getElementById('manualSubject').value,rows=ctx.catalog.filter(x=>x.subject===s);document.getElementById('manualTopic').innerHTML=rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.topic)+'</option>').join('');manualTopicChanged()};
- window.manualTopicChanged=function(){if(!ctx)return;const id=document.getElementById('manualTopic').value,p=topicProgress(id);document.getElementById('manualProgressPreview').value='İlerleme: %'+(p?.progress_percent||0)};
+ window.manualLoadTopics=function(){if(!ctx)return;const s=document.getElementById('manualSubject').value,rows=ctx.catalog.filter(x=>x.subject===s),sel=document.getElementById('manualTopic'),tap=document.getElementById('manualTopicTapList');sel.innerHTML=rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.topic)+'</option>').join('');if(tap){tap.innerHTML=rows.map(x=>'<button type="button" class="manualTopicTapBtn" data-topic-id="'+esc(x.id)+'">'+esc(x.topic)+'</button>').join('');tap.querySelectorAll('.manualTopicTapBtn').forEach(btn=>btn.addEventListener('click',()=>manualPickTopic(btn.dataset.topicId)))}manualTopicChanged()};
+ window.manualPickTopic=function(id){const sel=document.getElementById('manualTopic');if(!sel)return;sel.value=String(id);manualTopicChanged()};
+ window.manualTopicChanged=function(){if(!ctx)return;const id=document.getElementById('manualTopic').value,p=topicProgress(id);document.getElementById('manualProgressPreview').value='İlerleme: %'+(p?.progress_percent||0);document.querySelectorAll('#manualTopicTapList .manualTopicTapBtn').forEach(btn=>btn.classList.toggle('active',String(btn.dataset.topicId)===String(id)))};
  window.saveManualPlanTask=async function(){if(!ctx)return;const btn=document.getElementById('manualAddBtn'),topicId=document.getElementById('manualTopic').value,row=ctx.catalog.find(x=>String(x.id)===String(topicId));if(!row)return alert('Konu seçin.');const day=document.getElementById('manualDay').value,start=document.getElementById('manualStart').value,end=document.getElementById('manualEnd').value,qv=document.getElementById('manualQuestions').value,desc=document.getElementById('manualDescription').value.trim();if(!start||!end||end<=start)return alert('Başlangıç ve bitiş saatini kontrol edin.');
    try{btn.disabled=true;btn.textContent='Kaydediliyor…';let pr=await sb.from('study_plans').select('id,status').eq('student_id',ctx.student.id).eq('week_start',ctx.week).maybeSingle();if(pr.error)throw pr.error;let plan=pr.data;if(!plan){const ins=await sb.from('study_plans').insert({student_id:ctx.student.id,coach_id:ctx.student.coach_id,week_start:ctx.week,status:'draft'}).select('id,status').single();if(ins.error)throw ins.error;plan=ins.data}
      const overlap=await sb.from('study_tasks').select('id,start_time,end_time').eq('plan_id',plan.id).eq('task_date',day);if(overlap.error)throw overlap.error;const toMin=v=>{const a=String(v).split(':');return Number(a[0])*60+Number(a[1])},a=toMin(start),b=toMin(end);if((overlap.data||[]).some(x=>a<toMin(x.end_time)&&b>toMin(x.start_time)))return alert('Bu saat aralığında başka bir görev var.');
