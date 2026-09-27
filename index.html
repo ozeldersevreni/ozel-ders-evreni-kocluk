@@ -2796,3 +2796,29 @@ window.onload=function(){
 })();
 </script>
 
+
+
+<style id="finalTopicTrackingHiddenAndProgressWidth20260927">
+button[onclick*="openTopicTracking"],button[onclick*="openStudentTopicTracking"],#topicTrackingBtn,.topicTrackingBtn,[data-action="topic-tracking"]{display:none!important}
+#students th:nth-child(6),#students td:nth-child(6){min-width:170px!important;width:170px!important}
+#students .progress{min-width:145px!important;width:145px!important;overflow:visible!important}
+#students .progress i{max-width:100%}
+@media(max-width:900px){#students th:nth-child(6),#students td:nth-child(6){min-width:165px!important;width:165px!important}#students .progress{min-width:140px!important;width:140px!important}}
+</style>
+<script id="finalHideTopicTrackingEverywhere20260927">
+(function(){
+ function hideTopicTrackingUI(){
+  document.querySelectorAll('button,a').forEach(function(el){
+   const txt=(el.textContent||'').replace(/\s+/g,' ').trim().toLocaleLowerCase('tr-TR');
+   const oc=(el.getAttribute('onclick')||'').toLocaleLowerCase('tr-TR');
+   if(txt.includes('konu takibi') && (oc.includes('topic') || el.closest('.nav,.side,.toolbar,.studentActions,.actions,.modalactions'))){
+    el.style.setProperty('display','none','important');
+   }
+  });
+ }
+ hideTopicTrackingUI();
+ window.addEventListener('load',hideTopicTrackingUI);
+ new MutationObserver(hideTopicTrackingUI).observe(document.documentElement,{childList:true,subtree:true});
+})();
+</script>
+
