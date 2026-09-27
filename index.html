@@ -2822,3 +2822,126 @@ button[onclick*="openTopicTracking"],button[onclick*="openStudentTopicTracking"]
 })();
 </script>
 
+
+
+<style id="safeDashboardVisualPack20260927">
+/* Öğretmen: haftalık ilerleme görünümü */
+#students td:nth-child(6){min-width:210px!important;width:210px!important}
+#students .progress{
+  display:inline-block!important;vertical-align:middle!important;
+  width:128px!important;min-width:128px!important;height:12px!important;
+  border-radius:999px!important;background:#e9edf5!important;
+  overflow:hidden!important;position:relative!important;cursor:default!important;
+  margin-right:8px!important;
+}
+#students .progress i{display:block!important;height:100%!important;border-radius:999px!important}
+#students .progress:after{content:none!important}
+.weekly-open-btn{
+  border:0!important;border-radius:10px!important;padding:7px 11px!important;
+  background:#1769e0!important;color:#fff!important;font-weight:800!important;
+  font-size:12px!important;cursor:pointer!important;white-space:nowrap!important;
+  box-shadow:0 2px 7px rgba(23,105,224,.18)!important;
+}
+.weekly-progress-pct{font-size:12px;font-weight:800;color:#344054;margin-right:7px;white-space:nowrap}
+.safe-student-summary{
+  margin:14px 0 16px;padding:16px;border:1px solid #e5e7eb;border-radius:16px;
+  background:linear-gradient(135deg,#f8fbff,#ffffff);box-shadow:0 4px 14px rgba(15,23,42,.05)
+}
+.safe-student-summary h3{margin:0 0 10px;font-size:18px}
+.safe-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.safe-summary-item{padding:10px 12px;border-radius:12px;background:#fff;border:1px solid #edf0f5}
+.safe-summary-item b{display:block;font-size:18px;margin-top:3px}
+.safe-summary-item small{color:#667085;font-weight:700}
+@media(max-width:700px){
+ #students td:nth-child(6){min-width:205px!important}
+ .safe-summary-grid{grid-template-columns:1fr}
+}
+</style>
+<script id="safeDashboardVisualPackScript20260927">
+(function(){
+ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+ function decorateTeacherProgress(){
+  document.querySelectorAll('#students tr[data-id]').forEach(function(row){
+   const cell=row.querySelector('td:nth-child(6)');
+   const progress=cell&&cell.querySelector('.progress');
+   if(!cell||!progress)return;
+   let pct=0;
+   const w=parseFloat((progress.querySelector('i')?.style.width||'0').replace('%',''));
+   if(Number.isFinite(w))pct=Math.max(0,Math.min(100,Math.round(w)));
+   let label=cell.querySelector('.weekly-progress-pct');
+   if(!label){label=document.createElement('span');label.className='weekly-progress-pct';progress.after(label)}
+   label.textContent='%'+pct;
+   let btn=cell.querySelector('.weekly-open-btn');
+   if(!btn){
+    btn=document.createElement('button');btn.type='button';btn.className='weekly-open-btn';
+    btn.innerHTML='👁&nbsp; Aç';
+    btn.addEventListener('click',function(ev){ev.stopPropagation();progress.click()});
+    label.after(btn);
+   }
+  });
+ }
+
+ function studentName(){
+  const candidates=[
+   document.getElementById('studentName')?.textContent,
+   document.querySelector('#student h1')?.textContent,
+   document.querySelector('#student h2')?.textContent
+  ].filter(Boolean);
+  if(candidates.length){
+   const s=candidates[0].replace(/öğrenci paneli/ig,'').replace(/hoş geldin/ig,'').trim();
+   if(s)return s;
+  }
+  return 'Öğrenci';
+ }
+
+ async function renderSafeStudentSummary(){
+  const student=document.getElementById('student');
+  if(!student||!student.classList.contains('show'))return;
+  const row=document.querySelector('#students tr[data-id]');
+  const sid=row?.dataset.id;if(!sid)return;
+  const week=mondayISO(),end=addDaysISO(week,6);
+  const {data,error}=await sb.from('study_tasks')
+   .select('task_date,start_time,end_time,status')
+   .eq('student_id',sid).gte('task_date',week).lte('task_date',end);
+  if(error)return;
+  const rows=data||[];
+  const today=new Date(), y=today.getFullYear(),m=String(today.getMonth()+1).padStart(2,'0'),d=String(today.getDate()).padStart(2,'0');
+  const iso=`${y}-${m}-${d}`;
+  const todays=rows.filter(x=>x.task_date===iso);
+  const done=todays.filter(x=>x.status==='completed').length;
+  let mins=0;
+  todays.forEach(x=>{
+   if(!x.start_time||!x.end_time)return;
+   const a=x.start_time.split(':').map(Number),b=x.end_time.split(':').map(Number);
+   const n=(b[0]*60+b[1])-(a[0]*60+a[1]);if(n>0&&n<720)mins+=n;
+  });
+  const weeklyDone=rows.filter(x=>x.status==='completed').length;
+  const pct=rows.length?Math.round(weeklyDone*100/rows.length):0;
+  let box=document.getElementById('safeStudentSummary20260927');
+  if(!box){
+   box=document.createElement('section');box.id='safeStudentSummary20260927';box.className='safe-student-summary';
+   const anchor=student.querySelector('.cards');
+   if(anchor)anchor.after(box); else student.prepend(box);
+  }
+  const duration=mins>=60?`${Math.floor(mins/60)} sa ${mins%60?mins%60+' dk':''}`.trim():`${mins} dk`;
+  box.innerHTML=`<h3>👋 Hoş geldin ${esc(studentName())}</h3>
+   <div class="safe-summary-grid">
+    <div class="safe-summary-item"><small>🎯 Bugün</small><b>${todays.length} görev</b><small>${done} tamamlandı • ${Math.max(0,todays.length-done)} kaldı</small></div>
+    <div class="safe-summary-item"><small>⏱️ Bugünkü plan</small><b>${esc(duration)}</b><small>programdaki toplam süre</small></div>
+    <div class="safe-summary-item"><small>📈 Haftalık ilerleme</small><b>%${pct}</b><small>${weeklyDone}/${rows.length} görev tamamlandı</small></div>
+   </div>`;
+ }
+
+ const oldRefresh=window.refreshAllStudentProgress;
+ if(typeof oldRefresh==='function'){
+  window.refreshAllStudentProgress=async function(){const r=await oldRefresh.apply(this,arguments);decorateTeacherProgress();return r}
+ }
+ const oldStudent=window.refreshStudentDashboard;
+ if(typeof oldStudent==='function'){
+  window.refreshStudentDashboard=async function(){const r=await oldStudent.apply(this,arguments);await renderSafeStudentSummary();return r}
+ }
+ window.addEventListener('load',()=>setTimeout(()=>{decorateTeacherProgress();renderSafeStudentSummary()},700));
+})();
+</script>
+
