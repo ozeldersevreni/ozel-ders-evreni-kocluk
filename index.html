@@ -251,28 +251,39 @@ async function refreshStudentDashboard(){
  const {data:pubPlan,error:ppe}=await sb.from('study_plans').select('id').eq('student_id',activeStudentId).eq('week_start',week).eq('status','published').maybeSingle();if(ppe)return;let rows=[];if(pubPlan){const rr=await sb.from('study_tasks').select('id,task_date,start_time,end_time,subject,topic,description,target_questions,status').eq('plan_id',pubPlan.id).order('task_date').order('start_time');if(rr.error)return;rows=rr.data||[]}
  const a=rows||[],done=a.filter(x=>x.status==='completed').length,todayRows=a.filter(x=>x.task_date===today),todayDone=todayRows.filter(x=>x.status==='completed').length;
  document.getElementById('studentTodayTotal').textContent=todayRows.length;document.getElementById('studentTodayDone').textContent=todayDone;document.getElementById('studentProgress').textContent='%'+(a.length?Math.round(done*100/a.length):0);document.getElementById('studentWeekRemaining').textContent=a.length-done;
- const taskHtml=t=>`<div class="task"><div>${escapeHtml((t.start_time||'').slice(0,5))}${t.end_time?'–'+escapeHtml(t.end_time.slice(0,5)):''}</div><div><span class="tag">${escapeHtml(t.subject)}</span><h3>${escapeHtml(t.topic||'')}</h3><div>${escapeHtml(t.description||'')}</div>${t.target_questions!=null?`<small>${t.target_questions} soru</small>`:''}<div>${t.status==='completed'?'<span class="done">✓ Tamamlandı</span>':'<span>Bekliyor</span>'}</div></div><div><button class="${t.status==='completed'?'secondary':'green'} small" onclick="studentToggleTask('${t.id}','${t.status}')">${t.status==='completed'?'↩ Geri Al':'✓ Tamamladım'}</button></div></div>`;
+ const taskHtml=t=>`<div class="task"><div>${escapeHtml((t.start_time||'').slice(0,5))}${t.end_time?'–'+escapeHtml(t.end_time.slice(0,5)):''}</div><div><span class="tag">${escapeHtml(t.subject)}</span><h3>${escapeHtml(t.topic||'')}</h3><div>${escapeHtml(t.description||'')}</div>${t.target_questions!=null?`<small>${t.target_questions} soru</small>`:''}<div>${t.status==='completed'?'<span class="done">✓ Tamamlandı</span>':'<span>Bekliyor</span>'}</div></div><div><button type="button" class="${t.status==='completed'?'secondary':'green'} small" onclick="studentToggleTask('${t.id}','${t.status}',this)">${t.status==='completed'?'↩ Geri Al':'✓ Tamamladım'}</button></div></div>`;
  document.getElementById('studentTodayTasks').innerHTML=todayRows.length?todayRows.map(taskHtml).join(''):'<div class="empty">Bugün için görev bulunmuyor.</div>';
  const days=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];let groups='';for(let i=0;i<7;i++){let d=addDaysISO(week,i),rs=a.filter(x=>x.task_date===d);groups+=`<h3>${days[new Date(d+'T12:00:00').getDay()]} • ${d}</h3>`+(rs.length?rs.map(taskHtml).join(''):'<div class="empty">Görev yok.</div>')}document.getElementById('studentWeekTasks').innerHTML=groups;
  await Promise.all([loadStudentWritten(),loadStudentTopics(),loadStudentMocks(),renderExamCountdowns()]);
 }
-async function studentToggleTask(id,status){
+const studentTaskBusy=new Set();
+async function studentToggleTask(id,status,button){
  const studentId=activeStudentId;
  if(!studentId||!id)return alert('Görev veya öğrenci seçilemedi.');
+ if(studentTaskBusy.has(id))return;
+ studentTaskBusy.add(id);
+ if(button){button.disabled=true;button.textContent='Kaydediliyor…'}
  const next=status==='completed'?'pending':'completed';
+ let saved=false;
  try{
-  const {data,error}=await sb.from('study_tasks').update({status:next,updated_at:new Date().toISOString()}).eq('id',id).eq('student_id',studentId).select('id,status').maybeSingle();
+  const ownAccount=currentProfile?.role==='student';
+  const {data,error}=ownAccount
+   ? await sb.rpc('student_set_task_completion',{p_task_id:id,p_complete:next==='completed'})
+   : await sb.from('study_tasks').update({status:next,updated_at:new Date().toISOString()}).eq('id',id).eq('student_id',studentId).select('id,status').maybeSingle();
   if(error)throw error;
-  if(!data||data.status!==next)throw new Error('Görev veritabanında değişmedi. Öğrenci güncelleme iznini kontrol edin.');
+  if((ownAccount?data:data?.status)!==next)throw new Error('Görev veritabanında değişmedi.');
+  saved=true;
   await refreshStudentDashboard();
   if(currentProfile?.role!=='student'){await refreshAllStudentProgress();await refreshCompletionRate()}
- }catch(e){alert('Görev durumu güncellenemedi: '+(e.message||e))}
+ }catch(e){alert((saved?'Görev kaydedildi ancak ekran yenilenemedi; sayfayı yenileyin: ':'Görev durumu güncellenemedi: ')+(e.message||e))}
+ finally{studentTaskBusy.delete(id);if(button?.isConnected){button.disabled=false;button.textContent=status==='completed'?'↩ Geri Al':'✓ Tamamladım'}}
 }
 // Öğretmen ekranı açıkken öğrencinin başka cihazdaki tamamlamasını göster.
 setInterval(()=>{
  if(document.hidden||!currentProfile||currentProfile.role==='student'||document.getElementById('coach')?.classList.contains('hide'))return;
  refreshAllStudentProgress();
  refreshCompletionRate();
+ if(document.getElementById('scheduleModal')?.classList.contains('show'))loadScheduleForStudent();
 },30000);
 function studentWeek(delta,reset){studentWeekOffset=reset?0:studentWeekOffset+delta;refreshStudentDashboard()}
 async function loadStudentTopics(){const [{data:p},{data:t}]=await Promise.all([sb.from('student_topic_progress').select('topic_id,progress_percent,status').eq('student_id',activeStudentId),sb.from('subject_topics').select('id,subject,topic')]);const tm=new Map((t||[]).map(x=>[x.id,x]));let rows=(p||[]).filter(x=>tm.has(x.topic_id)).sort((a,b)=>(b.progress_percent||0)-(a.progress_percent||0)).slice(0,8);document.getElementById('studentTopicSummary').innerHTML=rows.length?rows.map(x=>{let z=tm.get(x.topic_id);return `<div class="examListItem"><span><b>${escapeHtml(z.subject)}</b><br><small>${escapeHtml(z.topic)}</small></span><span>%${x.progress_percent||0} • ${x.status==='completed'?'Tamamlandı':x.status==='review_needed'?'Tekrar Gerekli':x.status==='in_progress'?'Çalışılıyor':'Başlanmadı'}</span></div>`}).join(''):'<div class="empty">Henüz konu ilerlemesi kaydı yok.</div>'}
@@ -294,7 +305,7 @@ let examDatesCache={};async function loadExamDatesCloud(){try{const {data}=await
 openExamSettings=async function(){await loadExamDatesCloud();yksExamDate.value=examDatesCache.YKS||'';lgsExamDate.value=examDatesCache.LGS||'';examSettingsModal.classList.add('show')};
 saveExamSettings=async function(){if(currentProfile?.role!=='admin')return alert('Sınav tarihlerini yalnızca Sistem Yöneticisi değiştirebilir.');const rows=[{key:'YKS_EXAM_DATE',value:yksExamDate.value},{key:'LGS_EXAM_DATE',value:lgsExamDate.value}];const {error}=await sb.from('app_settings').upsert(rows,{onConflict:'key'});if(error)return alert('Tarihler kaydedilemedi: '+error.message);examDatesCache={YKS:yksExamDate.value,LGS:lgsExamDate.value};closeModal('examSettingsModal');renderExamCountdowns()};
 function examTypeForStudent(){if(activeStudentId){let row=document.querySelector(`#students tr[data-id="${activeStudentId}"]`);if(row&&/LGS/i.test(row.cells[3]?.textContent||''))return'LGS'}return activeExamType()}
-paint=function(rootId,type){const root=document.getElementById(rootId);if(!root)return;const raw=examDatesCache[type],title=root.querySelector('[id$="CountdownTitle"]'),note=root.querySelector('[id$="CountdownDate"]');title.textContent='🎯 '+type+' Sınavına Geri Sayım';if(!raw){note.textContent='Sınav tarihi ayarlanmadı.';root.querySelectorAll('[data-cd]').forEach(x=>x.textContent='—');return}const now=new Date(),target=new Date(raw+'T10:00:00');if(target<=now){root.querySelectorAll('[data-cd]').forEach(x=>x.textContent='0');return}let cursor=new Date(now),months=0;while(true){let n=new Date(cursor);n.setMonth(n.getMonth()+1);if(n<=target){months++;cursor=n}else break}let rem=target-cursor,weeks=Math.floor(rem/604800000);rem-=weeks*604800000;let days=Math.floor(rem/86400000);rem-=days*86400000;let hours=Math.floor(rem/3600000);let minutes=Math.floor((rem-hours*3600000)/60000);let set=(k,v)=>{let e=root.querySelector(`[data-cd="${k}"]`);if(e)e.textContent=v};set('months',months);set('weeks',weeks);set('days',days);set('hours',hours);set('minutes',minutes);note.textContent=new Intl.DateTimeFormat('tr-TR',{dateStyle:'long'}).format(target)+(rootId==='studentCountdown'?'':' • '+type)};
+paint=function(rootId,type){const root=document.getElementById(rootId);if(!root)return;const raw=examDatesCache[type],title=root.querySelector('[id$="CountdownTitle"]'),note=root.querySelector('[id$="CountdownDate"]');if(!title||!note)return;title.textContent='🎯 '+type+' Sınavına Geri Sayım';if(!raw){note.textContent='Sınav tarihi ayarlanmadı.';root.querySelectorAll('[data-cd]').forEach(x=>x.textContent='—');return}const now=new Date(),target=new Date(raw+'T10:00:00');if(target<=now){root.querySelectorAll('[data-cd]').forEach(x=>x.textContent='0');return}let cursor=new Date(now),months=0;while(true){let n=new Date(cursor);n.setMonth(n.getMonth()+1);if(n<=target){months++;cursor=n}else break}let rem=target-cursor,weeks=Math.floor(rem/604800000);rem-=weeks*604800000;let days=Math.floor(rem/86400000);rem-=days*86400000;let hours=Math.floor(rem/3600000);let minutes=Math.floor((rem-hours*3600000)/60000);let set=(k,v)=>{let e=root.querySelector(`[data-cd="${k}"]`);if(e)e.textContent=v};set('months',months);set('weeks',weeks);set('days',days);set('hours',hours);set('minutes',minutes);note.textContent=new Intl.DateTimeFormat('tr-TR',{dateStyle:'long'}).format(target)+(rootId==='studentCountdown'?'':' • '+type)};
 renderExamCountdowns=function(){paint('adminCountdown',activeExamType());paint('studentCountdown',examTypeForStudent())};
 
 // Student school status editing.
