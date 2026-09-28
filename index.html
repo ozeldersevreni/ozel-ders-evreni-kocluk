@@ -256,7 +256,24 @@ async function refreshStudentDashboard(){
  const days=['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];let groups='';for(let i=0;i<7;i++){let d=addDaysISO(week,i),rs=a.filter(x=>x.task_date===d);groups+=`<h3>${days[new Date(d+'T12:00:00').getDay()]} • ${d}</h3>`+(rs.length?rs.map(taskHtml).join(''):'<div class="empty">Görev yok.</div>')}document.getElementById('studentWeekTasks').innerHTML=groups;
  await Promise.all([loadStudentWritten(),loadStudentTopics(),loadStudentMocks(),renderExamCountdowns()]);
 }
-async function studentToggleTask(id,status){const {error}=await sb.from('study_tasks').update({status:status==='completed'?'pending':'completed',updated_at:new Date().toISOString()}).eq('id',id).eq('student_id',activeStudentId);if(error)return alert(error.message);await refreshStudentDashboard()}
+async function studentToggleTask(id,status){
+ const studentId=activeStudentId;
+ if(!studentId||!id)return alert('Görev veya öğrenci seçilemedi.');
+ const next=status==='completed'?'pending':'completed';
+ try{
+  const {data,error}=await sb.from('study_tasks').update({status:next,updated_at:new Date().toISOString()}).eq('id',id).eq('student_id',studentId).select('id,status').maybeSingle();
+  if(error)throw error;
+  if(!data||data.status!==next)throw new Error('Görev veritabanında değişmedi. Öğrenci güncelleme iznini kontrol edin.');
+  await refreshStudentDashboard();
+  if(currentProfile?.role!=='student'){await refreshAllStudentProgress();await refreshCompletionRate()}
+ }catch(e){alert('Görev durumu güncellenemedi: '+(e.message||e))}
+}
+// Öğretmen ekranı açıkken öğrencinin başka cihazdaki tamamlamasını göster.
+setInterval(()=>{
+ if(document.hidden||!currentProfile||currentProfile.role==='student'||document.getElementById('coach')?.classList.contains('hide'))return;
+ refreshAllStudentProgress();
+ refreshCompletionRate();
+},30000);
 function studentWeek(delta,reset){studentWeekOffset=reset?0:studentWeekOffset+delta;refreshStudentDashboard()}
 async function loadStudentTopics(){const [{data:p},{data:t}]=await Promise.all([sb.from('student_topic_progress').select('topic_id,progress_percent,status').eq('student_id',activeStudentId),sb.from('subject_topics').select('id,subject,topic')]);const tm=new Map((t||[]).map(x=>[x.id,x]));let rows=(p||[]).filter(x=>tm.has(x.topic_id)).sort((a,b)=>(b.progress_percent||0)-(a.progress_percent||0)).slice(0,8);document.getElementById('studentTopicSummary').innerHTML=rows.length?rows.map(x=>{let z=tm.get(x.topic_id);return `<div class="examListItem"><span><b>${escapeHtml(z.subject)}</b><br><small>${escapeHtml(z.topic)}</small></span><span>%${x.progress_percent||0} • ${x.status==='completed'?'Tamamlandı':x.status==='review_needed'?'Tekrar Gerekli':x.status==='in_progress'?'Çalışılıyor':'Başlanmadı'}</span></div>`}).join(''):'<div class="empty">Henüz konu ilerlemesi kaydı yok.</div>'}
 async function loadStudentMocks(){const {data,error}=await sb.from('mock_exams').select('exam_date,exam_name,exam_type,total_correct,total_wrong,total_blank,total_net').eq('student_id',activeStudentId).order('exam_date',{ascending:false}).limit(5);document.getElementById('studentMockSummary').innerHTML=error?`<div class="empty">${escapeHtml(error.message)}</div>`:(data||[]).length?(data||[]).map(x=>`<div class="examListItem"><span><b>${escapeHtml(x.exam_name)}</b><br><small>${x.exam_date} • ${escapeHtml(x.exam_type)}</small></span><span><b>${x.total_net} net</b><br><small>${x.total_correct}/${x.total_wrong}/${x.total_blank}</small></span></div>`).join(''):'<div class="empty">Henüz deneme kaydı yok.</div>'}
