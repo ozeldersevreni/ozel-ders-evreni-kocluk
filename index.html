@@ -723,7 +723,12 @@ window.generateAIPlan=async function(){
     const workerBase='https://ozel-ders-evreni-ai.mrylmz0636.workers.dev';
 
     status.innerHTML='<b>Durum:</b> Program oluşturma kuyruğuna ekleniyor…';
-    const enqueueRes=await fetch(workerBase+'/enqueue',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify({student:data,image,week_start:week})});
+    const lgsRequiredInstruction=st.program_type==='LGS'
+      ? 'LGS HAFTALIK DERS DAĞILIMI ZORUNLU: Haftalık çalışma programında Türkçe, Matematik, Fen Bilimleri, T.C. İnkılap Tarihi ve Atatürkçülük, Din Kültürü ve Ahlak Bilgisi ve İngilizce derslerinin HER BİRİNDEN en az 1 çalışma görevi oluştur. Bu altı dersten hiçbirini atlama. Ders ve konu adlarını izin verilen konu kataloğundaki adlarla birebir kullan.'
+      : '';
+    const enqueuePayload={student:data,image,week_start:week};
+    if(lgsRequiredInstruction)enqueuePayload.coach_instruction=lgsRequiredInstruction;
+    const enqueueRes=await fetch(workerBase+'/enqueue',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify(enqueuePayload)});
     const enqueueOut=await enqueueRes.json().catch(()=>({}));
     if(!enqueueRes.ok)throw new Error(enqueueOut.error||'Program oluşturma kuyruğuna ulaşılamadı.');
     const jobId=enqueueOut.job_id||enqueueOut.id;
