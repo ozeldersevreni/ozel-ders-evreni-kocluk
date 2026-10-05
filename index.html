@@ -2672,8 +2672,6 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
 (function(){
  const E=id=>document.getElementById(id);
  const esc=s=>escapeHtml(String(s??''));
- const norm=s=>String(s||'').trim().toLocaleLowerCase('tr-TR');
- const isEA=st=>st.program_type==='YKS'&&(norm(st.field).includes('eşit')||norm(st.field)==='ea');
  let requestNumber=0;
 
  // Written exams follow school courses, independently of the TYT/AYT/YDT stage.
@@ -2690,7 +2688,6 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
    const r=await q.order('subject');
    if(r.error)throw new Error('Yazılı dersleri alınamadı: '+r.error.message);
    let subjects=[...new Set((r.data||[]).map(x=>String(x.subject||'').trim()).filter(Boolean))];
-   if(isEA(st))subjects=subjects.filter(s=>!['fizik','kimya','biyoloji','fen'].some(x=>norm(s).includes(x)));
    if(!subjects.length)throw new Error('Bu öğrencinin sınıfına uygun yazılı dersi bulunamadı. Sınıf/program bilgisini kontrol edin.');
    return subjects.sort((a,b)=>a.localeCompare(b,'tr'));
  };
