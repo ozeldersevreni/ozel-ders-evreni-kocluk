@@ -171,7 +171,7 @@ async function sendUpdateRequest(){let q=document.getElementById('aiChatInput').
 </script><div class="modal" id="studentTopicEntryModal"><div class="modalbox"><h2>📚 Çalışma Ekle</h2><div class="field"><label>Konu</label><select id="steTopic"></select></div><div class="formgrid"><div class="field"><label>Çözülen Soru</label><input id="steQuestions" min="0" type="number" value="0"/></div><div class="field"><label>İlerleme (%)</label><input id="stePercent" max="100" min="0" type="number" value="10"/></div></div><div class="field"><label>Durum</label><select id="steStatus"><option value="in_progress">Çalışıyor</option><option value="review_needed">Tekrar Gerekli</option><option value="completed">Tamamlandı</option></select></div><div class="modalactions"><button class="secondary" onclick="closeModal('studentTopicEntryModal')">İptal</button><button class="primary" onclick="saveStudentTopicEntry()">Kaydet</button></div></div></div><div class="modal" id="studentMockEntryModal"><div class="modalbox"><h2>📊 Deneme Ekle</h2><div class="formgrid"><div class="field"><label>Tür</label><select id="smeType"><option value="tyt">TYT</option><option value="ayt">AYT</option><option value="lgs">LGS</option><option value="brans">Branş</option></select></div><div class="field"><label>Tarih</label><input id="smeDate" type="date"/></div></div><div class="field"><label>Deneme Adı</label><input id="smeName" placeholder="Örn. Türkiye Geneli 1"/></div><div class="formgrid"><div class="field"><label>Doğru</label><input id="smeCorrect" min="0" type="number"/></div><div class="field"><label>Yanlış</label><input id="smeWrong" min="0" type="number"/></div><div class="field"><label>Boş</label><input id="smeBlank" min="0" type="number"/></div></div><div class="modalactions"><button class="secondary" onclick="closeModal('studentMockEntryModal')">İptal</button><button class="primary" onclick="saveStudentMockEntry()">Kaydet</button></div></div></div><div class="modal" id="writtenExamModal"><div class="modalbox"><h2>📝 Yazılı Ekle / Düzenle</h2><div class="formgrid"><div class="field"><label>Ders</label><select id="writtenSubject"></select></div><div class="field"><label>Yazılı tarihi</label><input id="writtenDate" type="date"/></div></div><div class="modalactions"><button class="secondary" onclick="closeModal('writtenExamModal')">İptal</button><button class="primary" onclick="saveWrittenExam()">Kaydet</button></div></div></div><script>
 async function fillFeatureStudents(id){const sel=document.getElementById(id);const {data,error}=await sb.from('students').select('id,full_name,grade,program_type,field,exam_stage').order('full_name');if(error)throw error;sel.innerHTML=(data||[]).map(x=>`<option value="${x.id}">${escapeHtml(x.full_name)} • ${escapeHtml(x.program_type||'')} ${escapeHtml(x.exam_stage||'')}</option>`).join('');return data||[]}
 function scopesForStudent(s){if(s.program_type==='LGS')return ['COMMON'];if(s.program_type==='ARA')return ['COMMON'];let f=(s.field||'').toLocaleLowerCase('tr-TR');if((s.exam_stage||'TYT')==='TYT')return ['COMMON'];if((s.exam_stage||'')==='YDT'||f.includes('dil'))return ['DIL'];if(f.includes('say'))return ['SAY_EA','SAY'];if(f.includes('eşit'))return ['SAY_EA','EA_SOZ'];if(f.includes('söz'))return ['EA_SOZ','SOZ'];return ['COMMON']}
-async function getCatalogForStudent(student){const {data:s}=await sb.from('students').select('id,grade,program_type,field,exam_stage').eq('id',student.id).single();if(!s)return[];let q=sb.from('subject_topics').select('id,subject,topic,program_type,exam_stage,field_scope,grade').eq('program_type',s.program_type);if(s.program_type==='YKS')q=q.eq('exam_stage',s.exam_stage||'TYT').in('field_scope',scopesForStudent(s));else if(s.program_type==='LGS')q=q.eq('grade','8');else q=q.eq('grade',String(s.grade));const {data}=await q.order('subject').order('sort_order');return(data||[]).map(x=>({id:x.id,subject:x.subject,topic:x.topic}))}
+async function getCatalogForStudent(student){const {data:s}=await sb.from('students').select('id,grade,program_type,field,exam_stage').eq('id',student.id).single();if(!s)return[];let q=sb.from('subject_topics').select('id,subject,topic,program_type,exam_stage,field_scope,grade').eq('curriculum_active',true).eq('program_type',s.program_type);if(s.program_type==='YKS')q=q.eq('exam_stage',s.exam_stage||'TYT').in('field_scope',scopesForStudent(s));else if(s.program_type==='LGS')q=q.eq('grade','8');else q=q.eq('grade',String(s.grade));const {data}=await q.order('subject').order('sort_order');return(data||[]).map(x=>({id:x.id,subject:x.subject,topic:x.topic}))}
 async function getProgressForAI(studentId){const {data}=await sb.from('student_topic_progress').select('topic_id,progress_percent,status,questions_solved,last_exam_percent,ai_note,coach_note').eq('student_id',studentId);return data||[]}
 let topicCache=[];
 async function openTopicTracking(){document.getElementById('topicModal').classList.add('show');await fillFeatureStudents('topicStudent');await loadTopicTracking()}
@@ -294,7 +294,7 @@ function editWrittenExam(id,subject,date){editingWrittenId=id;writtenSubject.val
 async function saveWrittenExam(){let subject=writtenSubject.value.trim(),exam_date=writtenDate.value;if(!subject||!exam_date)return alert('Ders ve tarih zorunludur.');const {data:s}=await sb.from('students').select('coach_id,school_status').eq('id',activeStudentId).single();if(s?.school_status==='graduate')return alert('Mezun öğrenciler için yazılı takvimi kullanılmaz.');let q=editingWrittenId?sb.from('written_exams').update({subject,exam_date,updated_at:new Date().toISOString()}).eq('id',editingWrittenId):sb.from('written_exams').insert({student_id:activeStudentId,coach_id:s.coach_id,subject,exam_date,created_by:currentProfile.id});const {error}=await q;if(error)return alert('Yazılı kaydedilemedi: '+error.message);closeModal('writtenExamModal');await loadStudentWritten()}
 async function deleteWrittenExam(id){if(!confirm('Bu yazılı tarihi silinsin mi?'))return;const {error}=await sb.from('written_exams').delete().eq('id',id);if(error)return alert(error.message);await loadStudentWritten()}
 // Topic catalog: normalize values and report DB errors instead of silently returning empty.
-getCatalogForStudent=async function(student){const {data:s,error:se}=await sb.from('students').select('id,grade,program_type,field,exam_stage').eq('id',student.id).single();if(se)throw se;let stage=(s.exam_stage||'TYT').toUpperCase().replace('YKS - ','').replace('YKS ','').trim();let q=sb.from('subject_topics').select('id,subject,topic,program_type,exam_stage,field_scope,grade').eq('program_type',s.program_type);if(s.program_type==='YKS')q=q.eq('exam_stage',stage).in('field_scope',scopesForStudent({...s,exam_stage:stage}));else if(s.program_type==='LGS')q=q.eq('grade','8');else q=q.eq('grade',String(s.grade));const {data,error}=await q.order('subject').order('sort_order');if(error)throw error;return(data||[]).map(x=>({id:x.id,subject:x.subject,topic:x.topic}))};
+getCatalogForStudent=async function(student){const {data:s,error:se}=await sb.from('students').select('id,grade,program_type,field,exam_stage').eq('id',student.id).single();if(se)throw se;let stage=(s.exam_stage||'TYT').toUpperCase().replace('YKS - ','').replace('YKS ','').trim();let q=sb.from('subject_topics').select('id,subject,topic,program_type,exam_stage,field_scope,grade').eq('curriculum_active',true).eq('program_type',s.program_type);if(s.program_type==='YKS')q=q.eq('exam_stage',stage).in('field_scope',scopesForStudent({...s,exam_stage:stage}));else if(s.program_type==='LGS')q=q.eq('grade','8');else q=q.eq('grade',String(s.grade));const {data,error}=await q.order('subject').order('sort_order');if(error)throw error;return(data||[]).map(x=>({id:x.id,subject:x.subject,topic:x.topic}))};
 // Report modal close safety + formatting.
 const oldLoadReport=loadReport;loadReport=async function(){await oldLoadReport();document.querySelectorAll('#reportContent .reportStat b').forEach(x=>x.style.display='block')};
 // Update module is admin-only and app-level, not student-level.
@@ -728,7 +728,7 @@ window.generateAIPlan=async function(){
       else if(fld.includes('eşit')||fld==='ea') scopes=['SAY_EA','EA_SOZ'];
       else if(fld.includes('söz')) scopes=['EA_SOZ','SOZ'];
     }
-    let cq=sb.from('subject_topics').select('id,subject,topic,program_type,exam_stage,field_scope,grade').eq('program_type',st.program_type);
+    let cq=sb.from('subject_topics').select('id,subject,topic,program_type,exam_stage,field_scope,grade').eq('curriculum_active',true).eq('program_type',st.program_type);
     if(st.program_type==='YKS') cq=cq.eq('exam_stage',stage).in('field_scope',scopes);
     else if(st.program_type==='LGS') cq=cq.eq('grade','8');
     else cq=cq.eq('grade',String(st.grade));
@@ -783,7 +783,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <script id="v185Patch">
 const V185_FALLBACK_SUBJECTS=['Türkçe','Matematik','Geometri','Tarih','Coğrafya','Felsefe','Din Kültürü','Fizik','Kimya','Biyoloji','İngilizce'];let v185SubjectCache=new Map(),v185TaskEditId=null,v185TaskCatalog=[];
 function v185Norm(v){return normalizeSubjectName(v)}function v185Arr(v){if(Array.isArray(v))return v.filter(Boolean);if(!v)return[];return String(v).split(',').map(x=>x.trim()).filter(Boolean)}
-async function v185Subjects(st){const key=[st?.program_type,st?.exam_stage,st?.grade].join('|');if(v185SubjectCache.has(key))return v185SubjectCache.get(key);try{let q=sb.from('subject_topics').select('subject').eq('program_type',st.program_type);if(st.program_type==='YKS')q=q.eq('exam_stage',String(st.exam_stage||'TYT').toUpperCase().replace('YKS - ','').trim());else if(st.program_type==='LGS')q=q.eq('grade','8');else if(st.grade)q=q.eq('grade',String(st.grade));const r=await q;if(r.error)throw r.error;const a=[...new Set((r.data||[]).map(x=>x.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));const out=a.length?a:V185_FALLBACK_SUBJECTS;v185SubjectCache.set(key,out);return out}catch(_){return V185_FALLBACK_SUBJECTS}}
+async function v185Subjects(st){const key=[st?.program_type,st?.exam_stage,st?.grade].join('|');if(v185SubjectCache.has(key))return v185SubjectCache.get(key);try{let q=sb.from('subject_topics').select('subject').eq('curriculum_active',true).eq('program_type',st.program_type);if(st.program_type==='YKS')q=q.eq('exam_stage',String(st.exam_stage||'TYT').toUpperCase().replace('YKS - ','').trim());else if(st.program_type==='LGS')q=q.eq('grade','8');else if(st.grade)q=q.eq('grade',String(st.grade));const r=await q;if(r.error)throw r.error;const a=[...new Set((r.data||[]).map(x=>x.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));const out=a.length?a:V185_FALLBACK_SUBJECTS;v185SubjectCache.set(key,out);return out}catch(_){return V185_FALLBACK_SUBJECTS}}
 function v185Render(id,subjects,selected=[]){const el=document.getElementById(id);if(!el)return;const set=new Set(v185Arr(selected).map(v185Norm));el.innerHTML=subjects.map(x=>`<label class="subjectCheck"><input type="checkbox" value="${escapeHtml(x)}" ${set.has(v185Norm(x))?'checked':''}> ${escapeHtml(x)}</label>`).join('')}
 function v185Checked(id){return [...document.querySelectorAll('#'+id+' input:checked')].map(x=>x.value)}
 async function v185RefreshNew(){const a=await v185Subjects({program_type:nsProgram.value,exam_stage:nsStage.value,grade:nsGrade.value});v185Render('nsStrongChecks',a);v185Render('nsWeakChecks',a);v185Render('nsExcludedChecks',a)}
@@ -792,7 +792,7 @@ saveNewStudent=async function(){const name=nsName.value.trim(),program_type=nsPr
 openInfo=async function(id){try{activeStudentId=id;const {data,error}=await sb.from('students').select('target,daily_minutes,strong_subjects,weak_subjects,excluded_subjects,coach_notes,school_status,student_phone,parent_name,parent_phone,coach_id,program_type,exam_stage,field,grade').eq('id',id).single();if(error)throw error;document.getElementById('infoGoal').value=data?.target||'';document.getElementById('infoHours').value=data?.daily_minutes?Number(data.daily_minutes)/60:'';document.getElementById('infoNote').value=data?.coach_notes||'';document.getElementById('infoSchoolStatus').value=data?.school_status||'school';document.getElementById('infoStudentPhone').value=data?.student_phone||'';document.getElementById('infoParentName').value=data?.parent_name||'';document.getElementById('infoParentPhone').value=data?.parent_phone||'';const a=await v185Subjects(data||{});v185Render('infoStrongChecks',a,data?.strong_subjects);v185Render('infoWeakChecks',a,data?.weak_subjects);v185Render('infoExcludedChecks',a,data?.excluded_subjects);const cw=document.getElementById('infoCoachWrap'),cs=document.getElementById('infoCoach');if(cw&&cs){cw.style.display=currentProfile?.role==='admin'?'flex':'none';if(currentProfile?.role==='admin'){const tr=await sb.from('profiles').select('id,full_name,status').eq('role','coach').in('status',['active','disabled']).order('full_name');if(tr.error)throw tr.error;cs.innerHTML='<option value="">Atanmamış</option>'+((tr.data||[]).map(t=>`<option value="${t.id}">${escapeHtml(t.full_name||'Öğretmen')}${t.status==='disabled'?' (Pasif)':''}</option>`).join(''));cs.value=data?.coach_id||''}}const modal=document.getElementById('infoModal');if(!modal)throw new Error('Öğrenci Bilgileri penceresi bulunamadı.');modal.classList.add('show');return true}catch(e){console.error('openInfo',e);alert('Öğrenci bilgileri açılamadı: '+(e?.message||e));return false}}
 saveInfo=async function(){let hours=infoHours.value===''?null:Number(infoHours.value);const payload={target:infoGoal.value.trim(),daily_minutes:hours===null?null:Math.round(hours*60),strong_subjects:v185Checked('infoStrongChecks').join(', ')||null,weak_subjects:v185Checked('infoWeakChecks').join(', ')||null,excluded_subjects:v185Checked('infoExcludedChecks'),coach_notes:infoNote.value.trim(),school_status:infoSchoolStatus.value,student_phone:infoStudentPhone.value.trim(),parent_name:infoParentName.value.trim(),parent_phone:infoParentPhone.value.trim(),updated_at:new Date().toISOString()};if(currentProfile?.role==='admin')payload.coach_id=infoCoach.value||null;const {error}=await sb.from('students').update(payload).eq('id',sid);if(error)return alert('Bilgiler kaydedilemedi: '+error.message);closeModal('infoModal');await loadCloudStudents()}
 async function v185Written(selected=''){const {data:st}=await sb.from('students').select('program_type,exam_stage,grade').eq('id',activeStudentId).single(),a=await v185Subjects(st||{});writtenSubject.innerHTML=a.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');writtenSubject.value=selected||a[0]||''}openWrittenExamModal=async function(){editingWrittenId=null;writtenDate.value='';await v185Written();document.getElementById('writtenExamModal').classList.add('show')};editWrittenExam=async function(id,subject,date){editingWrittenId=id;writtenDate.value=date;await v185Written(subject);document.getElementById('writtenExamModal').classList.add('show')}
-editDraftTask=async function(id){if(!canManagePlans())return;const {data:t,error}=await sb.from('study_tasks').select('*').eq('id',id).single();if(error)return alert(error.message);v185TaskEditId=id;const {data:st}=await sb.from('students').select('program_type,exam_stage,grade').eq('id',t.student_id).single();let q=sb.from('subject_topics').select('subject,topic').eq('program_type',st.program_type);if(st.program_type==='YKS')q=q.eq('exam_stage',String(st.exam_stage||'TYT').toUpperCase().replace('YKS - ','').trim());else if(st.program_type==='LGS')q=q.eq('grade','8');else q=q.eq('grade',String(st.grade));const r=await q.order('subject').order('sort_order');if(r.error)return alert(r.error.message);v185TaskCatalog=r.data||[];const a=[...new Set(v185TaskCatalog.map(x=>x.subject))];teSubject.innerHTML=a.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');teSubject.value=t.subject||a[0]||'';v185LoadTaskTopics(t.topic);teStart.value=String(t.start_time||'18:00').slice(0,5);teEnd.value=String(t.end_time||'19:00').slice(0,5);teQuestions.value=t.target_questions??'';document.getElementById('taskEditV185Modal').classList.add('show')}
+editDraftTask=async function(id){if(!canManagePlans())return;const {data:t,error}=await sb.from('study_tasks').select('*').eq('id',id).single();if(error)return alert(error.message);v185TaskEditId=id;const {data:st}=await sb.from('students').select('program_type,exam_stage,grade').eq('id',t.student_id).single();let q=sb.from('subject_topics').select('subject,topic').eq('curriculum_active',true).eq('program_type',st.program_type);if(st.program_type==='YKS')q=q.eq('exam_stage',String(st.exam_stage||'TYT').toUpperCase().replace('YKS - ','').trim());else if(st.program_type==='LGS')q=q.eq('grade','8');else q=q.eq('grade',String(st.grade));const r=await q.order('subject').order('sort_order');if(r.error)return alert(r.error.message);v185TaskCatalog=r.data||[];const a=[...new Set(v185TaskCatalog.map(x=>x.subject))];teSubject.innerHTML=a.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');teSubject.value=t.subject||a[0]||'';v185LoadTaskTopics(t.topic);teStart.value=String(t.start_time||'18:00').slice(0,5);teEnd.value=String(t.end_time||'19:00').slice(0,5);teQuestions.value=t.target_questions??'';document.getElementById('taskEditV185Modal').classList.add('show')}
 function v185LoadTaskTopics(selected=''){const a=v185TaskCatalog.filter(x=>x.subject===teSubject.value);teTopic.innerHTML=a.map(x=>`<option value="${escapeHtml(x.topic)}">${escapeHtml(x.topic)}</option>`).join('');teTopic.value=selected||a[0]?.topic||''}async function v185SaveTaskEdit(){if(!v185TaskEditId)return;const {error}=await sb.from('study_tasks').update({subject:teSubject.value,topic:teTopic.value,start_time:teStart.value,end_time:teEnd.value,target_questions:teQuestions.value===''?null:Number(teQuestions.value)}).eq('id',v185TaskEditId);if(error)return alert(error.message);closeModal('taskEditV185Modal');await loadScheduleForStudent()}
 function validateAITasks(raw,student,week,planId){const forbidden=v185Arr(student.excluded_subjects).map(v185Norm),maxDaily=Math.max(60,Number(student.daily_minutes)||180),used={},seen=new Set(),out=[];for(let i=0;i<Math.min((raw||[]).length,40);i++){const t=raw[i]||{},subj=String(t.subject||'').trim(),ns=v185Norm(subj);if(!subj||forbidden.includes(ns))continue;let d=t.task_date;if(!d||d<week||d>addDaysISO(week,6))d=addDaysISO(week,Math.min(i,6));const st=String(t.start_time||'').slice(0,5),en=String(t.end_time||'').slice(0,5),a=hmToMin(st),b=hmToMin(en);if(a==null||b==null||b<=a)continue;used[d]=used[d]||[];if(used[d].some(x=>a<x.b&&b>x.a))continue;if(used[d].reduce((z,x)=>z+x.b-x.a,0)+(b-a)>maxDaily)continue;const key=[d,ns,v185Norm(t.topic)].join('|');if(seen.has(key))continue;seen.add(key);used[d].push({a,b});out.push({plan_id:planId,student_id:student.id,task_date:d,start_time:st,end_time:en,subject:subj,topic:String(t.topic||''),description:String(t.description||''),target_questions:Number.isFinite(+t.target_questions)?+t.target_questions:null,status:'pending'})}return out}
 function validatePlanRowsForPublish(tasks,student){const errs=[],byDay={},maxDaily=Math.max(60,Number(student.daily_minutes)||180),forbidden=v185Arr(student.excluded_subjects).map(v185Norm);for(const t of tasks||[]){const ns=v185Norm(t.subject),a=hmToMin(t.start_time),b=hmToMin(t.end_time);if(forbidden.includes(ns))errs.push('Programdan çıkarılan ders bulundu: '+t.subject);if(a==null||b==null||b<=a)errs.push('Geçersiz saat: '+t.subject);(byDay[t.task_date]??=[]).push({a,b})}for(const [d,a] of Object.entries(byDay)){a.sort((x,y)=>x.a-y.a);let total=0;for(let i=0;i<a.length;i++){total+=Math.max(0,a[i].b-a[i].a);if(i&&a[i].a<a[i-1].b)errs.push('Saat çakışması: '+d)}}return [...new Set(errs)]}
@@ -1150,7 +1150,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
       .eq('id',t.student_id).single();
     if(se)return alert('Öğrenci bilgisi alınamadı: '+se.message);
 
-    let q=sb.from('subject_topics').select('subject,topic')
+    let q=sb.from('subject_topics').select('subject,topic').eq('curriculum_active',true)
       .eq('program_type',st.program_type);
     if(st.program_type==='YKS'){
       q=q.eq('exam_stage',String(st.exam_stage||'TYT').toUpperCase().replace('YKS - ','').trim());
@@ -1245,7 +1245,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
     if(error)return alert('Görev alınamadı: '+error.message);
     window.v185TaskEditId=id;
     // Tüm katalog: ders değiştiğinde o derse ait tüm kayıtlı konular gelir.
-    const r=await sb.from('subject_topics').select('subject,topic').order('subject').order('sort_order');
+    const r=await sb.from('subject_topics').select('subject,topic').eq('curriculum_active',true).order('subject').order('sort_order');
     if(r.error)return alert('Ders/konu listesi alınamadı: '+r.error.message);
     window.v185TaskCatalog=r.data||[];
     const subjects=[...new Set(v185TaskCatalog.map(x=>String(x.subject||'').trim()).filter(Boolean))];
@@ -1332,7 +1332,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 
  async function allProgramCatalog(st){
    let q=sb.from('subject_topics')
-     .select('id,subject,topic,program_type,exam_stage,field_scope,grade,sort_order')
+     .select('id,subject,topic,program_type,exam_stage,field_scope,grade,sort_order').eq('curriculum_active',true)
      .eq('program_type',st.program_type);
    if(st.program_type==='LGS') q=q.eq('grade','8');
    else if(st.program_type==='ARA') q=q.eq('grade',String(st.grade||''));
@@ -1452,7 +1452,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
  window.__extraCtx=null; window.__extraCatalog=[];
 
  async function extraCatalogFor(st){
-   let q=sb.from('subject_topics').select('subject,topic,program_type,exam_stage,field_scope,grade,sort_order').eq('program_type',st.program_type);
+   let q=sb.from('subject_topics').select('subject,topic,program_type,exam_stage,field_scope,grade,sort_order').eq('curriculum_active',true).eq('program_type',st.program_type);
    if(st.program_type==='LGS') q=q.eq('grade','8');
    else if(st.program_type==='ARA') q=q.eq('grade',String(st.grade||''));
    const r=await q.order('subject').order('sort_order'); if(r.error)throw r.error;
@@ -1573,7 +1573,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
  window.__extraCtx=null; window.__extraCatalog=[];
 
  async function catalog(st){
-   let q=sb.from('subject_topics').select('subject,topic,program_type,exam_stage,field_scope,grade,sort_order').eq('program_type',st.program_type);
+   let q=sb.from('subject_topics').select('subject,topic,program_type,exam_stage,field_scope,grade,sort_order').eq('curriculum_active',true).eq('program_type',st.program_type);
    if(st.program_type==='LGS')q=q.eq('grade','8');
    else if(st.program_type==='ARA')q=q.eq('grade',String(st.grade||''));
    const r=await q.order('subject').order('sort_order');if(r.error)throw r.error;
@@ -1745,7 +1745,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
      try{rows=await getCatalogForStudent(st)||[]}catch(_){rows=[]}
    }
    if(!rows.length){
-     let q=sb.from('subject_topics').select('id,subject,topic,program_type,exam_stage,field_scope,grade,sort_order').eq('program_type',st.program_type);
+     let q=sb.from('subject_topics').select('id,subject,topic,program_type,exam_stage,field_scope,grade,sort_order').eq('curriculum_active',true).eq('program_type',st.program_type);
      if(st.program_type==='LGS')q=q.eq('grade','8'); else if(st.program_type==='ARA')q=q.eq('grade',String(st.grade||''));
      const r=await q.order('subject').order('sort_order');if(r.error)throw r.error;rows=r.data||[];
    }
@@ -1809,7 +1809,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
     const p=String(cfg?.program_type||'').toUpperCase(),stage=String(cfg?.exam_stage||'TYT').toUpperCase().replace('YKS - ','').trim(),grade=String(cfg?.grade||'');
     let rows=[];
     try{
-      let q=sb.from('subject_topics').select('subject').eq('program_type',p);
+      let q=sb.from('subject_topics').select('subject').eq('curriculum_active',true).eq('program_type',p);
       if(p==='YKS')q=q.eq('exam_stage',stage); else if(p==='LGS')q=q.eq('grade','8'); else if(grade)q=q.eq('grade',grade);
       const r=await q;if(!r.error)rows=[...new Set((r.data||[]).map(x=>x.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
     }catch(_){}
@@ -1836,8 +1836,12 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 
   let writtenStudentId=null,writtenEditId=null;
   async function refreshWrittenSubjects(selected=''){
-    const r=await sb.from('students').select('program_type,exam_stage,grade,field').eq('id',writtenStudentId).single();if(r.error)return;
-    const a=await subjectList(r.data||{}),sel=E('centerWrittenSubject');sel.innerHTML=a.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');sel.value=(selected&&a.includes(selected))?selected:(a[0]||'');
+    const sel=E('centerWrittenSubject');sel.disabled=true;sel.innerHTML='<option value="">Dersler yükleniyor…</option>';
+    const r=await sb.from('students').select('program_type,exam_stage,grade,field').eq('id',writtenStudentId).single();
+    if(r.error)throw new Error('Öğrenci bilgisi alınamadı: '+r.error.message);
+    const a=await window.writtenExamSubjects20261005(r.data||{});
+    if(selected&&!a.includes(selected))a.unshift(selected);
+    sel.innerHTML=a.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');sel.value=selected||a[0]||'';sel.disabled=false;
   }
   async function refreshWrittenList(){
     const box=E('centerWrittenList');if(!box||!writtenStudentId)return;
@@ -1848,7 +1852,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
   window.openCenterWrittenManagerSafe=async function(id){
     writtenStudentId=id;window.activeStudentId=id;writtenEditId=null;
     const {data,error}=await sb.from('students').select('full_name,school_status').eq('id',id).single();if(error)return alert('Öğrenci bilgisi alınamadı: '+error.message);if(data?.school_status==='graduate')return alert('Mezun öğrenciler için yazılı takvimi kullanılmaz.');
-    closeModal('studentCenterModal');E('centerWrittenTitle').textContent='📝 '+(data?.full_name||'Öğrenci')+' Yazılıları';E('centerWrittenDate').value='';E('centerWrittenSaveBtn').textContent='+ Yazılı Ekle';E('centerWrittenCancelEdit').style.display='none';await refreshWrittenSubjects();await refreshWrittenList();E('centerWrittenModal').classList.add('show');
+    closeModal('studentCenterModal');E('centerWrittenTitle').textContent='📝 '+(data?.full_name||'Öğrenci')+' Yazılıları';E('centerWrittenDate').value='';E('centerWrittenSaveBtn').textContent='+ Yazılı Ekle';E('centerWrittenCancelEdit').style.display='none';try{await refreshWrittenSubjects();await refreshWrittenList();E('centerWrittenModal').classList.add('show');}catch(e){alert(e.message||String(e));}
   };
   window.centerWrittenSaveSafe=async function(){
     if(!writtenStudentId)return;const subject=E('centerWrittenSubject').value,date=E('centerWrittenDate').value;if(!subject||!date)return alert('Ders ve tarih zorunludur.');
@@ -1857,7 +1861,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
     else{const st=await sb.from('students').select('coach_id').eq('id',writtenStudentId).single();if(st.error)return alert(st.error.message);({error}=await sb.from('written_exams').insert({student_id:writtenStudentId,coach_id:st.data?.coach_id,subject,exam_date:date,created_by:currentProfile.id}));}
     if(error)return alert('Yazılı kaydedilemedi: '+error.message);writtenEditId=null;E('centerWrittenDate').value='';E('centerWrittenSaveBtn').textContent='+ Yazılı Ekle';E('centerWrittenCancelEdit').style.display='none';await refreshWrittenList();
   };
-  window.centerWrittenEditSafe=async function(id,subject,date){writtenEditId=id;await refreshWrittenSubjects(subject);E('centerWrittenDate').value=date;E('centerWrittenSaveBtn').textContent='Değişikliği Kaydet';E('centerWrittenCancelEdit').style.display='inline-block'};
+  window.centerWrittenEditSafe=async function(id,subject,date){try{await refreshWrittenSubjects(subject);writtenEditId=id;E('centerWrittenDate').value=date;E('centerWrittenSaveBtn').textContent='Değişikliği Kaydet';E('centerWrittenCancelEdit').style.display='inline-block'}catch(e){alert(e.message||String(e));}};
   window.centerWrittenCancelEditSafe=function(){writtenEditId=null;E('centerWrittenDate').value='';E('centerWrittenSaveBtn').textContent='+ Yazılı Ekle';E('centerWrittenCancelEdit').style.display='none'};
   window.centerWrittenDeleteSafe=async function(id){if(!confirm('Bu yazılı tarihi silinsin mi?'))return;const {error}=await sb.from('written_exams').delete().eq('id',id);if(error)return alert('Yazılı silinemedi: '+error.message);await refreshWrittenList()};
 })();
@@ -2334,7 +2338,7 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
   const esc=s=>String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   let ruleStudent=null;
   async function subjectsFor(st){
-    let q=sb.from('subject_topics').select('subject').eq('program_type',st.program_type);
+    let q=sb.from('subject_topics').select('subject').eq('curriculum_active',true).eq('program_type',st.program_type);
     if(st.program_type==='YKS') q=q.eq('exam_stage','TYT');
     else if(st.program_type==='LGS') q=q.eq('grade','8');
     else q=q.eq('grade',String(st.grade||''));
@@ -2662,4 +2666,72 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',wire); else wire();
   setInterval(tickStudentClock,1000);
 })();
+</script>
+
+<script id="writtenSubjectsFix20261005">
+(function(){
+ const E=id=>document.getElementById(id);
+ const esc=s=>escapeHtml(String(s??''));
+ const norm=s=>String(s||'').trim().toLocaleLowerCase('tr-TR');
+ const isEA=st=>st.program_type==='YKS'&&(norm(st.field).includes('eşit')||norm(st.field)==='ea');
+ let requestNumber=0;
+
+ // Written exams follow school courses, independently of the TYT/AYT/YDT stage.
+ window.writtenExamSubjects20261005=async function(st){
+   const grade=String(st.grade||'').trim();
+   const schoolYKS=st.program_type==='YKS'&&/^(5|6|7|8|9|10|11|12)$/.test(grade);
+   let q=sb.from('subject_topics').select('subject').eq('curriculum_active',true)
+     .eq('program_type',schoolYKS?'ARA':st.program_type);
+   if(st.program_type==='LGS')q=q.eq('grade','8');
+   else if(schoolYKS||st.program_type==='ARA'){
+     if(!grade)throw new Error('Öğrencinin sınıf bilgisi eksik.');
+     q=q.eq('grade',grade);
+   }else q=q.eq('exam_stage',String(st.exam_stage||'TYT').toUpperCase().replace(/^YKS\s*-?\s*/,'').trim());
+   const r=await q.order('subject');
+   if(r.error)throw new Error('Yazılı dersleri alınamadı: '+r.error.message);
+   let subjects=[...new Set((r.data||[]).map(x=>String(x.subject||'').trim()).filter(Boolean))];
+   if(isEA(st))subjects=subjects.filter(s=>!['fizik','kimya','biyoloji','fen'].some(x=>norm(s).includes(x)));
+   if(!subjects.length)throw new Error('Bu öğrencinin sınıfına uygun yazılı dersi bulunamadı. Sınıf/program bilgisini kontrol edin.');
+   return subjects.sort((a,b)=>a.localeCompare(b,'tr'));
+ };
+
+ window.v185Written=async function(selected=''){
+   // Top-level let activeStudentId is not a window property. StudentView sets that let.
+   const sid=(typeof activeStudentId!=='undefined'&&activeStudentId)||window.activeStudentId;
+   const sel=E('writtenSubject');
+   if(!sel)throw new Error('Yazılı ders alanı bulunamadı.');
+   const ticket=++requestNumber;
+   sel.disabled=true;sel.innerHTML='<option value="">Dersler yükleniyor…</option>';
+   try{
+     if(!sid)throw new Error('Öğrenci seçilemedi. Öğrenci ekranını yeniden açın.');
+     const r=await sb.from('students').select('id,program_type,exam_stage,grade,field,school_status').eq('id',sid).single();
+     if(r.error)throw new Error('Öğrenci bilgisi alınamadı: '+r.error.message);
+     if(!r.data)throw new Error('Öğrenci bulunamadı.');
+     if(r.data.school_status==='graduate')throw new Error('Mezun öğrenciler için yazılı takvimi kullanılmaz.');
+     const subjects=await window.writtenExamSubjects20261005(r.data);
+     if(ticket!==requestNumber)return;
+     activeStudentId=sid;window.activeStudentId=sid;
+     // Preserve an existing written exam's subject when editing a historical record.
+     if(selected&&!subjects.includes(selected))subjects.unshift(selected);
+     sel.innerHTML=subjects.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
+     sel.value=selected||subjects[0];sel.disabled=false;
+   }catch(e){
+     if(ticket===requestNumber)sel.innerHTML='<option value="">Dersler yüklenemedi</option>';
+     throw e;
+   }
+ };
+ async function openWritten(selected,date,id){
+   editingWrittenId=id||null;
+   const modal=E('writtenExamModal');if(!modal)return alert('Yazılı penceresi bulunamadı.');
+   E('writtenDate').value=date||'';
+   const save=modal.querySelector('button.primary');if(save)save.disabled=true;
+   modal.classList.add('show');
+   try{await window.v185Written(selected||'');}
+   catch(e){alert(e.message||String(e));}
+   finally{if(save)save.disabled=E('writtenSubject').disabled;}
+ }
+ window.openWrittenExamModal=()=>openWritten('','',null);
+ window.editWrittenExam=(id,subject,date)=>openWritten(subject,date,id);
+})();
+
 </script>
