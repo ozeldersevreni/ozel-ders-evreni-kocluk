@@ -2947,3 +2947,63 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
 })();
 
 </script>
+
+<script id="teacherAccountInfo20261012">
+(function(){
+  const container=document.getElementById('teacherDetailStudents');
+  if(!container||typeof window.openTeacherDetail!=='function')return;
+  const section=document.createElement('section');
+  section.id='teacherAccountInfo';section.className='studentSection';section.hidden=true;
+  section.innerHTML='<h3>Hesap Bilgileri</h3><div id="teacherAccountEmail" style="overflow-wrap:anywhere"></div><p id="teacherAccountStatus" role="status" aria-live="polite"></p><button type="button" class="primary" id="teacherAccountReset" disabled>Şifre sıfırlama e-postası gönder</button>';
+  container.before(section);
+  const email=document.getElementById('teacherAccountEmail'),status=document.getElementById('teacherAccountStatus'),button=document.getElementById('teacherAccountReset');
+  let selected=null,ready=false,revision=0,busy=false,queue=Promise.resolve();
+  const admin=()=>currentProfile?.role==='admin';
+  function clear(){revision++;selected=null;ready=false;section.hidden=true;email.textContent='';status.textContent='';button.disabled=true;}
+  async function request(action,id){
+    if(!admin())throw new Error('Bu işlem yalnızca yöneticiye açıktır.');
+    const {data,error}=await sb.functions.invoke('admin-teacher-account',{body:{action,teacher_id:id}});
+    if(error){let message='Öğretmen hesap servisine ulaşılamadı. admin-teacher-account kurulumunu ve oturumunuzu kontrol edin.';
+      try{const detail=await error.context?.json();if(detail?.error)message=detail.error}catch(_){}
+      throw new Error(message);
+    }
+    if(data?.error)throw new Error(data.error);
+    return data;
+  }
+  const prior=window.openTeacherDetail;
+  window.openTeacherDetail=async function(id){
+    clear();const ticket=revision;
+    if(!admin())return alert('Öğretmen hesap bilgileri yalnızca yöneticiye açıktır.');
+    const self=this,args=arguments;
+    // Hızlı öğretmen değişiminde eski detay isteği yeni ekrana yazmasın.
+    const work=queue.catch(()=>{}).then(()=>ticket===revision&&admin()?prior.apply(self,args):false);
+    queue=work;
+    const result=await work;
+    if(ticket!==revision||!admin()||!id||window.teacherDetailCurrentId!==id)return result;
+    selected=id;section.hidden=false;status.textContent='Hesap bilgileri yükleniyor…';
+    try{
+      const data=await request('lookup',id);
+      if(ticket!==revision||!admin())return result;
+      email.textContent='E-posta: '+(data?.email||'Kayıtlı e-posta bulunamadı');
+      ready=Boolean(data?.linked&&data.email);button.disabled=!ready||busy;
+      status.textContent=ready?'':'Bu hesaba şifre sıfırlama e-postası gönderilemiyor.';
+    }catch(e){if(ticket===revision&&admin())status.textContent=e.message;}
+    return result;
+  };
+  button.addEventListener('click',async()=>{
+    if(!admin()||!selected||!ready||busy)return;
+    const id=selected,ticket=revision;
+    if(!confirm('Bu öğretmenin kayıtlı e-posta adresine şifre sıfırlama bağlantısı gönderilsin mi?'))return;
+    busy=true;button.disabled=true;status.textContent='Gönderiliyor…';
+    try{
+      await request('send_reset',id);
+      if(ticket===revision&&admin())status.textContent='Şifre sıfırlama isteği kabul edildi. Öğretmen e-postasını ve spam klasörünü kontrol etsin.';
+    }catch(e){if(ticket===revision&&admin())status.textContent=e.message;}
+    finally{busy=false;if(admin()&&selected)button.disabled=!ready;}
+  });
+  const close=window.closeModal;
+  if(typeof close==='function')window.closeModal=function(id){if(id==='teacherDetailModal')clear();return close.apply(this,arguments)};
+  sb.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT')clear()});
+})();
+
+</script>
