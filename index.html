@@ -2835,3 +2835,53 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
 })();
 
 </script>
+<script id="adminAccountInfo20261011">
+(function(){
+  const section=document.createElement('section');
+  section.id='adminAccountInfo';section.className='studentSection';section.hidden=true;
+  section.innerHTML='<h3>Hesap Bilgileri</h3><div id="adminAccountEmail" style="overflow-wrap:anywhere"></div><p id="adminAccountStatus" role="status" aria-live="polite"></p><button type="button" class="primary" id="adminAccountReset" disabled>Şifre sıfırlama bağlantısı gönder</button>';
+  const actions=document.querySelector('#infoModal .modalactions');
+  if(!actions)return;
+  actions.before(section);
+  let selected=null,ready=false,revision=0,busy=false;
+  const email=document.getElementById('adminAccountEmail'),status=document.getElementById('adminAccountStatus'),button=document.getElementById('adminAccountReset');
+  function admin(){return currentProfile?.role==='admin'}
+  function clear(){revision++;selected=null;ready=false;section.hidden=true;email.textContent='';status.textContent='';button.disabled=true;}
+  async function request(action,studentId){
+    if(!admin())throw new Error('Bu işlem yalnızca yöneticiye açıktır.');
+    const {data,error}=await sb.functions.invoke('admin-student-account',{body:{action,student_id:studentId}});
+    if(error){let message='Hesap servisine ulaşılamadı. Supabase servis kurulumunu ve oturumunuzu kontrol edin.';
+      try{const detail=await error.context?.json();if(detail?.error)message=detail.error}catch(_){}
+      throw new Error(message);
+    }
+    if(data?.error)throw new Error(data.error);
+    return data;
+  }
+  const prior=window.openInfo;
+  window.openInfo=async function(studentId){
+    clear();const ticket=revision;
+    const result=await prior.apply(this,arguments);
+    if(!admin()||!studentId||ticket!==revision)return result;
+    selected=studentId;section.hidden=false;status.textContent='Hesap bilgileri yükleniyor…';
+    try{
+      const data=await request('lookup',studentId);
+      if(ticket!==revision||!admin())return result;
+      if(!data?.linked){status.textContent='Bu öğrenci henüz davet bağlantısıyla hesap oluşturmamış.';return result;}
+      email.textContent='E-posta: '+(data.email||'Kayıtlı e-posta bulunamadı');
+      ready=Boolean(data.email);button.disabled=!ready||busy;status.textContent=ready?'':'Bu hesaba şifre sıfırlama e-postası gönderilemiyor.';
+    }catch(e){if(ticket===revision&&admin())status.textContent=e.message;}
+    return result;
+  };
+  button.addEventListener('click',async()=>{
+    if(!admin()||!selected||!ready||busy)return;
+    const studentId=selected,ticket=revision;
+    if(!confirm('Bu öğrencinin kayıtlı e-posta adresine şifre sıfırlama bağlantısı gönderilsin mi?'))return;
+    busy=true;button.disabled=true;status.textContent='Gönderiliyor…';
+    try{await request('send_reset',studentId);if(ticket===revision&&admin())status.textContent='Şifre sıfırlama isteği kabul edildi. Öğrenci e-postasını ve spam klasörünü kontrol etsin.';}
+    catch(e){if(ticket===revision&&admin())status.textContent=e.message;}
+    finally{busy=false;if(ticket===revision&&admin())button.disabled=!ready;}
+  });
+  sb.auth.onAuthStateChange((event)=>{if(event==='SIGNED_OUT')clear();});
+})();
+
+</script>
