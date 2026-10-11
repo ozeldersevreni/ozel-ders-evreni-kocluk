@@ -3007,3 +3007,24 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
 })();
 
 </script>
+
+<script id="localWeekDateFix20261012">
+(function(){
+  // Hafta başlangıcı kullanıcının yerel takvimidir; UTC'ye çevirince önceki gün çıkabilir.
+  window.mondayISO=function(base){
+    const d=base==null?new Date():new Date(base);
+    if(!Number.isFinite(d.getTime()))throw new Error('Hafta tarihi geçersiz.');
+    d.setHours(12,0,0,0);
+    const day=d.getDay();
+    d.setDate(d.getDate()+(day===0?-6:1-day));
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  };
+  window.scheduleTargetWeek=function(){
+    const d=new Date();
+    // Takvim haftası ile ilerle; yaz/kış saati değişimi günü kaydırmasın.
+    d.setDate(d.getDate()+scheduleWeekOffset*7);
+    return window.mondayISO(d);
+  };
+})();
+
+</script>
