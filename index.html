@@ -2885,3 +2885,65 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
 })();
 
 </script>
+
+<script id="programTopicHistory20261012">
+(function(){
+  const center=document.querySelector('#studentCenterModal .studentCenterActions');
+  if(!center)return;
+  const allowed=()=>['admin','coach'].includes(currentProfile?.role);
+  const button=document.createElement('button');button.id='programHistoryBtn';button.type='button';button.className='secondary';button.textContent='📚 Program ve Konu Geçmişi';button.hidden=true;center.appendChild(button);
+  const modal=document.createElement('div');modal.id='programHistoryModal';modal.className='modal';modal.style.zIndex='11000';
+  modal.innerHTML=`<div class="modalbox" style="width:min(1050px,96vw)"><div class="studentCenterHead"><div><h2 style="margin:0" id="programHistoryTitle">Program ve Konu Geçmişi</h2><p style="margin:8px 0 0">Yayınlanan görevler; silinen programların kayıtları da korunur.</p></div><button type="button" class="secondary" id="programHistoryClose">Kapat</button></div><div class="formgrid"><div class="field"><label for="historyFrom">Başlangıç tarihi</label><input id="historyFrom" type="date"></div><div class="field"><label for="historyTo">Bitiş tarihi</label><input id="historyTo" type="date"></div><div class="field"><label for="historySubject">Ders</label><select id="historySubject"><option value="">Tüm dersler</option></select></div><div class="field"><label for="historySearch">Konu ara</label><input id="historySearch" type="search" placeholder="Konu veya açıklama"></div></div><div class="toolbar"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="historyRevisions" style="width:20px;min-height:20px">Eski konu düzenlemelerini de göster</label><button type="button" class="secondary" id="historyClear">Filtreleri temizle</button><button type="button" class="secondary" id="historyRefresh">Yenile</button></div><p id="historyStatus" role="status" aria-live="polite"></p><div id="historyContent"></div></div>`;
+  modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-labelledby','programHistoryTitle');
+  document.body.appendChild(modal);
+  const E=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let selected=null,rows=[],ticket=0,loading=false;
+  const date=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v))?new Date(v+'T12:00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric',weekday:'long'}):String(v||'—');
+  function chosenStudent(){let id=null;try{id=centerStudentId}catch(_){}return id||window.activeCenterStudentId||null}
+  function reset(){rows=[];E('programHistoryTitle').textContent='Program ve Konu Geçmişi';E('historyContent').innerHTML='';E('historySubject').innerHTML='<option value="">Tüm dersler</option>';for(const id of ['historyFrom','historyTo','historySearch'])E(id).value='';E('historyRevisions').checked=false;}
+  function render(){
+    if(!allowed())return;
+    const from=E('historyFrom').value,to=E('historyTo').value,subject=E('historySubject').value,search=E('historySearch').value.trim().toLocaleLowerCase('tr-TR');
+    if(from&&to&&from>to){E('historyStatus').textContent='Başlangıç tarihi bitiş tarihinden sonra olamaz.';E('historyContent').innerHTML='';return;}
+    const latest=new Map();for(const r of rows){const key=r.source_plan_id+':'+r.source_task_id;const old=latest.get(key);if(!old||r.revision>old.revision)latest.set(key,r);}
+    const source=E('historyRevisions').checked?rows:[...latest.values()];
+    const visible=source.filter(r=>(!from||r.task_date>=from)&&(!to||r.task_date<=to)&&(!subject||r.subject===subject)&&(!search||(String(r.topic||'')+' '+String(r.description||'')).toLocaleLowerCase('tr-TR').includes(search)))
+      .sort((a,b)=>String(b.week_start).localeCompare(String(a.week_start))||String(a.source_plan_id).localeCompare(String(b.source_plan_id))||String(a.task_date).localeCompare(String(b.task_date))||String(a.start_time||'').localeCompare(String(b.start_time||''))||a.revision-b.revision);
+    E('historyStatus').textContent=visible.length+' konu/görev kaydı • '+new Set(visible.map(r=>r.source_plan_id)).size+' program';
+    if(!visible.length){E('historyContent').innerHTML='<div class="empty">'+(rows.length?'Bu filtrelerde kayıt yok.':'Henüz yayınlanmış program kaydı yok.')+'</div>';return;}
+    let previous='',html='';
+    for(const r of visible){const group=r.week_start+':'+r.source_plan_id;if(previous!==group){if(previous)html+='</tbody></table></div>';html+='<h3>'+esc(date(r.week_start))+' haftası</h3><div style="overflow-x:auto"><table><thead><tr><th>Tarih / Saat</th><th>Ders</th><th>Konu / Görev</th><th>Soru hedefi</th><th>Durum</th></tr></thead><tbody>';previous=group;}
+      const current=latest.get(r.source_plan_id+':'+r.source_task_id)?.id===r.id;
+      const state=r.task_status==='completed'?'Tamamlandı':r.task_status==='in_progress'?'Çalışılıyor':'Bekliyor';
+      html+='<tr><td>'+esc(date(r.task_date))+'<br><small>'+esc((r.start_time||'').slice(0,5))+(r.end_time?' – '+esc(r.end_time.slice(0,5)):'')+'</small></td><td>'+esc(r.subject)+'</td><td><b>'+esc(r.topic||'—')+'</b>'+(r.description?'<br><small>'+esc(r.description)+'</small>':'')+'<br><small>'+(r.revision>1?'Düzenleme '+r.revision+' • ':'')+(!current?'Önceki konu kaydı':'')+'</small></td><td>'+esc(r.target_questions??'—')+'</td><td>'+esc(state)+(r.source_deleted?'<br><small>Kaynak görev/program silinmiş</small>':'')+'</td></tr>';
+    }
+    E('historyContent').innerHTML=html+'</tbody></table></div>';
+  }
+  async function load(){
+    if(!allowed()||!selected)return;
+    const mine=++ticket,studentId=selected;loading=true;rows=[];E('historyContent').innerHTML='';E('historyStatus').textContent='Geçmiş yükleniyor…';E('historyRefresh').disabled=true;
+    try{
+      let q=sb.from('students').select('id,full_name,coach_id').eq('id',studentId);if(currentProfile.role==='coach')q=q.eq('coach_id',currentProfile.id);
+      const s=await q.maybeSingle();if(s.error)throw s.error;if(!s.data)throw new Error('Bu öğrencinin geçmişini görüntüleme yetkiniz yok.');
+      if(mine!==ticket||!allowed())return;E('programHistoryTitle').textContent=(s.data.full_name||'Öğrenci')+' — Program ve Konu Geçmişi';
+      const all=[];for(let offset=0;;offset+=500){
+        const r=await sb.from('program_topic_history').select('id,source_plan_id,source_task_id,revision,week_start,task_date,start_time,end_time,subject,topic,description,target_questions,task_status,recorded_at,source_deleted').eq('student_id',studentId).order('id',{ascending:true}).range(offset,offset+499);
+        if(r.error)throw r.error;if(mine!==ticket||!allowed())return;all.push(...(r.data||[]));if((r.data||[]).length<500)break;
+      }
+      rows=all;const current=E('historySubject').value;const subjects=[...new Set(rows.map(r=>r.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+      E('historySubject').innerHTML='<option value="">Tüm dersler</option>'+subjects.map(s=>'<option value="'+esc(s)+'">'+esc(s)+'</option>').join('');if(subjects.includes(current))E('historySubject').value=current;render();
+    }catch(e){if(mine===ticket&&allowed()){rows=[];E('historyContent').innerHTML='';E('historyStatus').textContent='Geçmiş alınamadı: '+(e.message||String(e))+' — Geçmiş SQL kurulumunu kontrol edin.';}}
+    finally{if(mine===ticket){loading=false;E('historyRefresh').disabled=false;}}
+  }
+  window.openProgramTopicHistory=async function(id){if(!allowed())return alert('Bu bölüm yalnızca yönetici ve öğretmene açıktır.');if(!id)return alert('Öğrenci seçilemedi.');selected=id;reset();modal.classList.add('show');await load();};
+  const previousCenter=window.openStudentCenter;
+  window.openStudentCenter=async function(){button.hidden=!allowed();const r=await previousCenter.apply(this,arguments);button.hidden=!allowed();return r;};
+  button.addEventListener('click',()=>window.openProgramTopicHistory(chosenStudent()));
+  E('programHistoryClose').addEventListener('click',()=>{ticket++;loading=false;modal.classList.remove('show');});
+  for(const id of ['historyFrom','historyTo','historySubject','historyRevisions'])E(id).addEventListener('change',()=>{if(!loading)render()});E('historySearch').addEventListener('input',()=>{if(!loading)render()});
+  E('historyClear').addEventListener('click',()=>{for(const id of ['historyFrom','historyTo','historySearch'])E(id).value='';E('historySubject').value='';E('historyRevisions').checked=false;if(!loading)render();});
+  E('historyRefresh').addEventListener('click',load);
+  sb.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){ticket++;selected=null;rows=[];reset();button.hidden=true;modal.classList.remove('show');}});
+})();
+
+</script>
