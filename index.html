@@ -183,7 +183,7 @@ async function loadMocks(){const sid=document.getElementById('mockStudent').valu
 async function saveMockExam(){const sid=document.getElementById('mockStudent').value,{data:s}=await sb.from('students').select('coach_id').eq('id',sid).single(),c=+document.getElementById('mockCorrect').value||0,w=+document.getElementById('mockWrong').value||0,b=+document.getElementById('mockBlank').value||0;const payload={student_id:sid,coach_id:s.coach_id,exam_type:document.getElementById('mockType').value.trim()||'Genel',exam_name:document.getElementById('mockName').value.trim()||'Deneme',exam_date:document.getElementById('mockDate').value||new Date().toISOString().slice(0,10),total_correct:c,total_wrong:w,total_blank:b,total_net:+(c-w/4).toFixed(2)};const {error}=await sb.from('mock_exams').insert(payload);if(error)return alert('Deneme kaydedilemedi: '+error.message);await loadMocks()}
 async function deleteMock(id){if(!confirm('Bu deneme kaydı silinsin mi?'))return;const {error}=await sb.from('mock_exams').delete().eq('id',id);if(error)return alert(error.message);await loadMocks()}
 async function openReports(){document.getElementById('reportsModal').classList.add('show');await fillFeatureStudents('reportStudent');await loadReport()}
-async function loadReport(){const sid=document.getElementById('reportStudent').value;if(!sid)return;const [{data:s},{data:t},{data:p},{data:m}]=await Promise.all([sb.from('students').select('*').eq('id',sid).single(),sb.from('study_tasks').select('status,target_questions').eq('student_id',sid),sb.from('student_topic_progress').select('progress_percent,status,questions_solved').eq('student_id',sid),sb.from('mock_exams').select('exam_date,exam_name,total_net').eq('student_id',sid).order('exam_date',{ascending:false}).limit(5)]);let done=(t||[]).filter(x=>x.status==='completed').length,taskPct=(t||[]).length?Math.round(done*100/t.length):0,topicPct=(p||[]).length?Math.round(p.reduce((a,x)=>a+(x.progress_percent||0),0)/p.length):0,last=(m||[])[0];document.getElementById('reportContent').innerHTML=`<h3>${escapeHtml(s.full_name)}</h3><p>${escapeHtml(s.program_type||'')} ${escapeHtml(s.exam_stage||'')} • ${escapeHtml(s.field||'')} • ${escapeHtml(s.grade||'')}. sınıf</p><div class="reportStats"><div class="reportStat"><b>%${taskPct}</b>Görev tamamlama</div><div class="reportStat"><b>%${topicPct}</b>Konu ilerleme</div><div class="reportStat"><b>${(m||[]).length}</b>Son denemeler</div><div class="reportStat"><b>${last?last.total_net:'—'}</b>Son net</div></div><h4>Koç Notu</h4><p>${escapeHtml(s.coach_notes||'Not bulunmuyor.')}</p><h4>Son Denemeler</h4>${(m||[]).map(x=>`<p>${x.exam_date} • ${escapeHtml(x.exam_name)} • <b>${x.total_net} net</b></p>`).join('')||'<p>Deneme kaydı yok.</p>'}`}
+async function loadReport(){const sid=document.getElementById('reportStudent').value;if(!sid)return;const [{data:s},{data:t},{data:p},{data:m}]=await Promise.all([sb.from('students').select('*').eq('id',sid).single(),sb.from('study_tasks').select('status,target_questions').eq('student_id',sid),window.getLearningProgressRows(sid),sb.from('mock_exams').select('exam_date,exam_name,total_net').eq('student_id',sid).order('exam_date',{ascending:false}).limit(5)]);let done=(t||[]).filter(x=>x.status==='completed').length,taskPct=(t||[]).length?Math.round(done*100/t.length):0,topicPct=(p||[]).length?Math.round(p.reduce((a,x)=>a+(x.progress_percent||0),0)/p.length):0,last=(m||[])[0];document.getElementById('reportContent').innerHTML=`<h3>${escapeHtml(s.full_name)}</h3><p>${escapeHtml(s.program_type||'')} ${escapeHtml(s.exam_stage||'')} • ${escapeHtml(s.field||'')} • ${escapeHtml(s.grade||'')}. sınıf</p><div class="reportStats"><div class="reportStat"><b>%${taskPct}</b>Görev tamamlama</div><div class="reportStat"><b>%${topicPct}</b>Konu ilerleme</div><div class="reportStat"><b>${(m||[]).length}</b>Son denemeler</div><div class="reportStat"><b>${last?last.total_net:'—'}</b>Son net</div></div><h4>Koç Notu</h4><p>${escapeHtml(s.coach_notes||'Not bulunmuyor.')}</p><h4>Son Denemeler</h4>${(m||[]).map(x=>`<p>${x.exam_date} • ${escapeHtml(x.exam_name)} • <b>${x.total_net} net</b></p>`).join('')||'<p>Deneme kaydı yok.</p>'}`}
 function printReport(){const c=document.getElementById('reportContent').innerHTML,w=window.open('','_blank');w.document.write(`<html><head><title>Öğrenci Raporu</title><style>body{font-family:Arial;padding:32px} .reportStats{display:flex;gap:12px}.reportStat{padding:12px;border:1px solid #ddd}
 /* V17.3 — phone/tablet/responsive hardening */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;background:#f4f7fb}html,body{width:100%;max-width:100%;overflow-x:hidden}body{min-height:100dvh;padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}button,input,select,textarea{font:inherit;max-width:100%}button{min-height:44px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}input,select,textarea{font-size:16px;width:100%}.main{min-width:0}.panel,.card,.studentSection,.countdownPanel{max-width:100%;min-width:0}.modal{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom))}.modalbox,.featureBox{max-height:calc(100dvh - 24px);overflow:auto;-webkit-overflow-scrolling:touch}.authOverlay{min-height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:max(14px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom))}.authCard{margin:auto;max-height:none}.authBrandLogo{width:min(130px,34vw);height:min(130px,34vw)}.authCard h1{font-size:clamp(24px,7vw,34px)}table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}.toolbar>*{max-width:100%}
@@ -742,6 +742,7 @@ window.generateAIPlan=async function(){
     const prog=await sb.from('student_topic_progress').select('topic_id,progress_percent,status,questions_solved,last_exam_percent,ai_note,coach_note').eq('student_id',sid);
     if(prog.error) throw prog.error;
     data.topic_progress=prog.data||[];
+    data=await window.applyLearningPlan(st,data);
 
     const customInstruction=document.getElementById('aiInstruction')?.value.trim()||'';
     let checkedTasks=(file||customInstruction)?null:prepareWeeklyProgramFromPrevious(st,week,data);
@@ -1742,7 +1743,8 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
  async function catalogFor(st){
    let rows=[];
    if(typeof getCatalogForStudent==='function'){
-     try{rows=await getCatalogForStudent(st)||[]}catch(_){rows=[]}
+     rows=await getCatalogForStudent(st)||[];
+     return rows.filter(x=>allowedSubject(st,x.subject));
    }
    if(!rows.length){
      let q=sb.from('subject_topics').select('id,subject,topic,program_type,exam_stage,field_scope,grade,sort_order').eq('curriculum_active',true).eq('program_type',st.program_type);
@@ -1762,7 +1764,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
      const sr=await sb.from('students').select('*').eq('id',sid).single();if(sr.error)throw sr.error;const st=sr.data;
      const cat=await catalogFor(st);
      const [pr,hr]=await Promise.all([
-       sb.from('student_topic_progress').select('topic_id,progress_percent,status,last_studied_at').eq('student_id',sid),
+       window.getLearningProgressRows(sid),
        sb.from('study_tasks').select('subject,topic,task_date,status').eq('student_id',sid).order('task_date',{ascending:false})
      ]);if(pr.error)throw pr.error;if(hr.error)throw hr.error;
      const pmap=new Map((pr.data||[]).map(x=>[String(x.topic_id),x])),hmap=new Map();
@@ -3025,6 +3027,218 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
     d.setDate(d.getDate()+scheduleWeekOffset*7);
     return window.mondayISO(d);
   };
+})();
+
+</script>
+
+<script id="learning-core20261015">
+(function(){
+ const norm=v=>String(v??'').normalize('NFKC').trim().toLocaleLowerCase('tr-TR').replace(/\s+/g,' ');
+ const key=t=>String(t.exam_stage)+'|'+norm(t.subject);
+ const course=v=>String(v??'').toLocaleLowerCase('tr-TR').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/[^a-z0-9]/g,'').replace(/^tyt/,'');
+ const isWeekday=date=>{const d=new Date(String(date)+'T12:00:00Z');return Number.isFinite(d.getTime())&&d.getUTCDay()>0&&d.getUTCDay()<6};
+ const ordered=rows=>[...(rows||[])].sort((a,b)=>Number(a.sort_order)-Number(b.sort_order)||String(a.id).localeCompare(String(b.id)));
+ function excluded(data,t){const x=data.student.excluded_subjects||[],list=Array.isArray(x)?x:String(x).split(',');return t.exam_stage==='TYT'&&list.some(s=>course(s)===course(t.subject))}
+ function phase(data){
+  const rows=data.topics.filter(t=>!excluded(data,t));
+  if(data.student.program_type!=='YKS')return null;
+  if(rows.some(t=>t.exam_stage==='TYT'&&!t.is_completed))return 'TYT';
+  return rows.some(t=>t.exam_stage==='YDT')?'YDT':'AYT';
+ }
+ function pending(data,limitToSchool=false){
+  const stage=phase(data),prefs=new Map((data.subject_settings||[]).map(s=>[key(s),s]));
+  return data.topics.filter(t=>{
+   if(t.is_completed||excluded(data,t)||(stage&&t.exam_stage!==stage))return false;
+   if(limitToSchool&&data.student.program_type==='ARA'){
+    const pref=prefs.get(key(t)),frontier=data.topics.find(x=>x.id===pref?.frontier_topic_id);
+    if(!frontier||key(frontier)!==key(t))return false;
+    const group=ordered(data.topics.filter(x=>key(x)===key(t)));
+    return group.findIndex(x=>x.id===t.id)<=group.findIndex(x=>x.id===frontier.id);
+   }
+   return true;
+  });
+ }
+ function next(data){const groups=new Map();for(const t of pending(data,true)){const k=key(t);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(t)}return [...groups.values()].map(g=>ordered(g)[0]);}
+ function pace(data,today){
+  const settings=data.settings||{},target=settings.target_date||(data.student.program_type!=='ARA'?data.student.exam_date||data.fallback_date:null);
+  const remaining=data.topics.filter(t=>!t.is_completed&&!excluded(data,t));
+  const prefs=new Map((data.subject_settings||[]).map(s=>[key(s),s]));
+  const minutes=remaining.reduce((n,t)=>n+Number(prefs.get(key(t))?.minutes_per_topic||settings.minutes_per_topic||120),0);
+  if(!target)return {remaining:remaining.length,minutes,target:null};
+  const end=new Date(target+'T12:00:00Z');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(target)||!Number.isFinite(end.getTime())||end.toISOString().slice(0,10)!==target)return {remaining:remaining.length,minutes,target:null};
+  end.setUTCDate(end.getUTCDate()-Number(settings.reserve_days??21));
+  const cutoff=end.toISOString().slice(0,10),start=new Date(today+'T12:00:00Z');
+  const total=Math.max(0,Math.floor((end-start)/86400000)+1);let days=Math.floor(total/7)*5;
+  for(let i=0;i<total%7;i++){const d=new Date(start);d.setUTCDate(d.getUTCDate()+i);if(isWeekday(d.toISOString().slice(0,10)))days++;}
+  const weeks=days/5,daily=Number(data.student.daily_minutes)||0,capacity=days*daily;
+  return {remaining:remaining.length,minutes,target,cutoff,days,weeks,capacity,daily,topicsPerWeek:weeks>0?remaining.length/weeks:null,minutesPerWeek:weeks>0?minutes/weeks:null,behind:remaining.length>0&&daily>0&&minutes>capacity};
+ }
+ window.ODEVLearningCore={norm,key,course,isWeekday,ordered,excluded,phase,pending,next,pace};
+})();
+
+</script>
+
+<script id="learning-ui20261015">
+(function(){
+ const C=window.ODEVLearningCore,E=id=>document.getElementById(id),views=new Map();
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const localDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+ const date=v=>v?new Date(v).toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'}):'—';
+ const style=document.createElement('style');style.textContent='.learningTools{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.learningTools>*{flex:1 1 130px;min-width:0}.learningList{max-height:480px;overflow:auto}.learningRow{border:1px solid #dde5ef;border-radius:12px;padding:12px;margin:8px 0;overflow-wrap:anywhere}.learningRow.finished{border-left:5px solid #159447;background:#f1fbf5}.learningRow.reviewed{border-left:5px solid #1769e0;background:#eef5ff}.learningBadge{display:inline-block;font-size:13px;font-weight:700;margin:6px 0;color:#304b69}.learningRow .toolbar{margin-bottom:0}.learningRow small{color:#52627a}.learningPace{padding:12px;background:#f2f6fc;border-radius:10px;margin:10px 0;font-size:14px;line-height:1.5}.learningPace.warning{background:#fff5df;color:#704500}.learningSettings{margin:12px 0}.learningSettings summary{cursor:pointer;font-weight:700;padding:10px 0}.learningSettings .field{margin:8px 0}.learningSettings input,.learningSettings select{width:100%;min-width:0}.learningSubjectSetting{border-top:1px solid #e1e7f0;padding-top:8px;margin-top:10px}';document.head.appendChild(style);
+ async function rpc(name,args){const r=await sb.rpc(name,args);if(r.error)throw r.error;return r.data}
+ window.fetchLearningData=async function(id){
+  const data=await rpc('odev_learning_catalog',{p_student_id:id});
+  if(!data?.student||!Array.isArray(data.topics))throw new Error('Konu listesi alınamadı.');
+  if(data.student.program_type!=='ARA'&&!data.settings.target_date&&!data.student.exam_date&&typeof getMainExamDateForProgram==='function')data.fallback_date=await getMainExamDateForProgram(data.student.program_type);
+  return data;
+ };
+ function studentId(){try{return activeStudentId||window.activeStudentId}catch(_){return window.activeStudentId}}
+ function showPace(data){
+  const p=C.pace(data,localDate());
+  if(!p.remaining)return '<div class="learningPace">✓ Bu listedeki bütün konular bitti. Tekrar Sayfası’ndan devam edebilirsin.</div>';
+  if(!p.target)return '<div class="learningPace">'+p.remaining+' konu kaldı. Süre hesabı için '+(data.student.program_type==='ARA'?'öğretmen dönem/yıl sonu hedefi belirlemeli.':'sınav veya hedef tarihi belirlenmeli.')+'</div>';
+  let text=p.remaining+' konu kaldı • Hedef: '+esc(date(p.target))+'<br>Yeni konular için hedef bitiş: '+esc(date(p.cutoff))+' • Tekrar/deneme için '+Number(data.settings.reserve_days??21)+' gün ayrıldı.';
+  if(p.weeks>0)text+='<br>Gerekli ortalama: haftada '+p.topicsPerWeek.toLocaleString('tr-TR',{maximumFractionDigits:1})+' konu / yaklaşık '+Math.ceil(p.minutesPerWeek/60*10)/10+' saat.';
+  else text+='<br>Yeni konu bitirme hedefinin tarihi geçti.';
+  if(!p.daily)text+='<br>Günlük çalışma süresi belirtilmediği için yetişme karşılaştırması yapılamıyor.';
+  if(p.behind)text+='<br><b>⚠ Bu süre tahminleri ve mevcut çalışma saatleriyle konular yetişmiyor. Öğretmen hedefi gözden geçirmeli.</b>';
+  if(data.student.program_type==='YKS')text+='<br>Program aşaması: '+esc(C.phase(data))+' • TYT bitmeden sonraki aşamaya geçilmez.';
+  if(data.student.program_type==='ARA'&&!data.subject_settings.some(s=>s.frontier_topic_id))text+='<br>Otomatik program için öğretmen her derste okulun geldiği konuyu belirlemeli.';
+  return '<div class="learningPace '+(p.behind||p.weeks<=0?'warning':'')+'">'+text+'<br><small>Süreler öğretmenin ayarlayabildiği tahminlerdir; bitirme garantisi değildir. Hesap pazartesi–cuma çalışma günlerini kullanır.</small></div>';
+ }
+ function settings(data){
+  if(!data.can_manage)return '';
+  const groups=new Map();for(const t of data.topics){const k=C.key(t);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(t)}
+  let html='<details class="learningSettings"><summary>Hedef ve süre ayarları</summary><div class="formgrid"><div class="field"><label>Hedef tarih (ara sınıflarda dönem/yıl sonu)</label><input type="date" data-setting="target" value="'+esc(data.settings.target_date||'')+'"></div><div class="field"><label>Tekrar/denemeye ayrılacak gün</label><input type="number" min="0" max="180" data-setting="reserve" value="'+Number(data.settings.reserve_days??21)+'"></div><div class="field"><label>Konu başına varsayılan tahmini dakika</label><input type="number" min="15" max="1800" data-setting="minutes" value="'+Number(data.settings.minutes_per_topic||120)+'"></div></div>';
+  let i=0;for(const [k,g] of groups){const pref=data.subject_settings.find(s=>C.key(s)===k),rows=C.ordered(g);
+   html+='<div class="learningSubjectSetting" data-pref="'+i+'"><b>'+esc(rows[0].exam_stage)+' • '+esc(rows[0].subject)+'</b><div class="field"><label>Bu derste konu başına tahmini dakika (boş: varsayılan)</label><input type="number" min="15" max="1800" data-pref-minutes="'+i+'" value="'+esc(pref?.minutes_per_topic??'')+'"></div>';
+   if(data.student.program_type==='ARA')html+='<div class="field"><label>Okulun geldiği konu (bu konu dahil)</label><select data-frontier="'+i+'"><option value="">Henüz belirlenmedi</option>'+rows.map(t=>'<option value="'+esc(t.id)+'" '+(pref?.frontier_topic_id===t.id?'selected':'')+'>'+esc(t.topic)+'</option>').join('')+'</select></div>';
+   html+='</div>';i++;
+  }
+  return html+'<button type="button" class="primary" data-action="settings">Ayarları kaydet</button></details>';
+ }
+ function render(view){
+  const {root,data}=view;if(!root||!data)return;
+  const subject=view.subject||'',search=C.norm(view.search||''),tab=view.tab||'pending';
+  const subjects=[...new Set(data.topics.map(t=>t.subject))];
+  const rows=data.topics.filter(t=>(tab==='done'?t.is_completed:!t.is_completed)&&(!subject||t.subject===subject)&&(!search||C.norm(t.topic+' '+t.subject).includes(search)));
+  const done=data.topics.filter(t=>t.is_completed).length;
+  root.innerHTML=showPace(data)+'<div class="learningTools"><button type="button" class="'+(tab==='pending'?'primary':'secondary')+'" data-tab="pending">Konu Listem ('+(data.topics.length-done)+')</button><button type="button" class="'+(tab==='done'?'primary':'secondary')+'" data-tab="done">Tekrar Sayfası ('+done+')</button></div><div class="learningTools"><select aria-label="Ders" data-filter="subject"><option value="">Tüm dersler</option>'+subjects.map(s=>'<option '+(subject===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>').join('')+'</select><input type="search" data-filter="search" aria-label="Konu ara" placeholder="Konu ara" value="'+esc(view.search||'')+'"><button type="button" class="secondary" data-action="refresh">Yenile</button></div><p role="status" aria-live="polite">'+rows.length+' konu • '+(tab==='done'?'Biten konular ve tekrar kayıtları':'Ders içinde müfredat sırasıyla')+'</p><div class="learningList">'+(rows.length?rows.map(t=>{
+   const reviewed=t.is_completed&&t.last_reviewed_at&&(!t.completed_at||t.last_reviewed_at>=t.completed_at),label=t.is_completed?(reviewed?'↻ Tekrar yapıldı':'✓ Bitti'):'Devam ediyor';
+   return '<div class="learningRow '+(t.is_completed?(reviewed?'reviewed':'finished'):'')+'"><small>'+esc(t.exam_stage)+' • '+esc(t.subject)+'</small><div><b>'+esc(t.topic)+'</b></div><span class="learningBadge">'+label+'</span>'+(t.is_completed?'<br><small>Bitiş: '+esc(date(t.completed_at))+' • Son tekrar: '+esc(date(t.last_reviewed_at))+' • '+Number(t.review_count)+' tekrar</small>':'')+'<div class="toolbar">'+(t.is_completed?'<button class="primary small" type="button" data-action="review" data-topic="'+esc(t.id)+'">Tekrar yaptım</button><button class="secondary small" type="button" data-action="undo" data-topic="'+esc(t.id)+'">Bitirmeyi geri al</button>':'<button class="green small" type="button" data-action="complete" data-topic="'+esc(t.id)+'">Konuyu bitirdim</button>')+'</div></div>';
+  }).join(''):'<div class="empty">Bu listede konu yok.</div>')+'</div>'+settings(data);
+ }
+ async function reload(view){const ticket=++view.ticket;view.root.innerHTML='<p role="status">Konu listesi yükleniyor…</p>';try{const data=await fetchLearningData(view.sid);if(ticket!==view.ticket)return;view.data=data;render(view);}catch(e){if(ticket===view.ticket)view.root.innerHTML='<p role="alert">Konu listesi alınamadı: '+esc(e.message||e)+'</p><button type="button" class="secondary" data-action="refresh">Yeniden dene</button>';}}
+ async function saveSettings(view){
+  const root=view.root,v=selector=>root.querySelector(selector)?.value;
+  const reserve=Number(v('[data-setting="reserve"]')),minutes=Number(v('[data-setting="minutes"]'));
+  if(!Number.isInteger(reserve)||reserve<0||reserve>180||!Number.isInteger(minutes)||minutes<15||minutes>1800)throw new Error('Hedef ve süre değerlerini kontrol edin.');
+  const groups=new Map();for(const t of view.data.topics){const k=C.key(t);if(!groups.has(k))groups.set(k,t)}
+  const subjects=[...groups.values()].map((t,i)=>{const n=v('[data-pref-minutes="'+i+'"]');if(n!==''&&(!Number.isInteger(Number(n))||Number(n)<15||Number(n)>1800))throw new Error('Ders sürelerini kontrol edin.');return {exam_stage:t.exam_stage,subject:t.subject,minutes_per_topic:n===''?null:Number(n),frontier_topic_id:v('[data-frontier="'+i+'"]')||null}});
+  await rpc('odev_learning_save_settings',{p_student_id:view.sid,p_target_date:v('[data-setting="target"]')||null,p_reserve_days:reserve,p_minutes_per_topic:minutes,p_subjects:subjects});
+ }
+ function attach(root,sid){
+  let view=views.get(root);if(!view){view={root,sid,ticket:0,tab:'pending',busy:false,reviewRequests:new Map()};views.set(root,view);
+   root.addEventListener('click',async event=>{const btn=event.target.closest('button');if(!btn||!root.contains(btn)||view.busy)return;
+    if(btn.dataset.tab){view.tab=btn.dataset.tab;render(view);return;}
+    const action=btn.dataset.action;if(!action)return;if(action==='refresh'){await reload(view);return;}
+    if(action==='undo'&&!confirm('Bu konunun bitirme işareti geri alınsın mı? Konu yeniden aktif listeye ve program sırasına girecek.'))return;
+    if(action==='complete'&&!confirm('Bu konuyu tamamen bitirdin mi? Biten konu otomatik programda yeniden verilmez.'))return;
+    const sid=view.sid,epoch=view.ticket;view.busy=true;btn.disabled=true;
+    try{if(action==='settings')await saveSettings(view);else{
+      const topic=view.data.topics.find(t=>t.id===btn.dataset.topic);if(!topic)throw new Error('Konu seçilemedi.');
+      const requestKey=sid+':'+topic.id;
+      if(action==='review'&&!view.reviewRequests.has(requestKey))view.reviewRequests.set(requestKey,crypto.randomUUID());
+      const requestId=action==='review'?view.reviewRequests.get(requestKey):crypto.randomUUID();
+      await rpc('odev_learning_action',{p_student_id:sid,p_topic_id:topic.id,p_action:action,p_version:topic.version,p_request_id:requestId});
+      view.reviewRequests.delete(requestKey);
+     }
+     if(sid===view.sid&&epoch===view.ticket)await reload(view);
+    }catch(e){if(sid===view.sid){alert('İşlem kaydedilemedi: '+(e.message||e));await reload(view);}}
+    finally{view.busy=false;btn.disabled=false;}
+   });
+   root.addEventListener('change',event=>{if(event.target.dataset.filter==='subject'){view.subject=event.target.value;render(view)}});
+   root.addEventListener('input',event=>{if(event.target.dataset.filter==='search'){view.search=event.target.value;const a=event.target.selectionStart;render(view);const input=root.querySelector('[data-filter="search"]');input?.focus();input?.setSelectionRange(a,a);}});
+  }
+  if(view.sid!==sid){view.ticket++;view.sid=sid;view.data=null;view.subject='';view.search='';view.tab='pending';}
+  return reload(view);
+ }
+ window.loadStudentTopics=async function(){const root=E('studentTopicSummary'),sid=studentId();if(!root||!sid)return;const oldButton=root.closest('.studentSection')?.querySelector('button[onclick="openStudentTopicEntry()"]');if(oldButton)oldButton.hidden=true;return attach(root,sid)};
+ window.loadTopicTracking=async function(){const sid=E('topicStudent')?.value,root=E('topicList');if(!root||!sid)return;const filter=E('topicSubject')?.closest('.field');if(filter)filter.style.display='none';const summary=E('topicSummary');if(summary)summary.textContent='Konu bitirme ve tekrar kayıtları öğrenciyle ortaktır.';return attach(root,sid)};
+ window.renderTopicRows=function(){const view=views.get(E('topicList'));if(view?.data)render(view)};
+ window.openStudentTopicEntry=async function(){await loadStudentTopics();E('studentTopicSummary')?.scrollIntoView({behavior:'smooth',block:'start'})};
+ window.saveStudentTopicEntry=window.openStudentTopicEntry;
+ window.saveTopicProgress=async function(){alert('Konu bitirme işlemini Konu Listem üzerindeki düğmelerden yapın.');};
+ window.deleteStudentTopicProgress=async function(){alert('Bitirmeyi geri almak için Tekrar Sayfası’ndaki Bitirmeyi geri al düğmesini kullanın.');};
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){for(const view of views.values()){if(view.sid&&!view.busy&&view.root.getClientRects().length)reload(view)}}});
+ sb.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){for(const v of views.values()){v.ticket++;v.sid=null;v.data=null;v.reviewRequests.clear();v.root.innerHTML='';}}});
+})();
+
+</script>
+
+<script id="learning-planner20261015">
+(function(){
+ const C=window.ODEVLearningCore;
+ const pairs=rows=>new Map(rows.map(t=>[C.course(t.subject),t]));
+ window.applyLearningPlan=async function(student,data){
+  const state=await fetchLearningData(student.id),next=C.next(state);
+  if(!state.topics.length)throw new Error('Öğrencinin sınıf/sınav/alanına uygun aktif konu kataloğu bulunamadı.');
+  if(!next.length){
+   if(C.pending(state).length&&student.program_type==='ARA')throw new Error('Okulun geldiği konu sınırına ulaşıldı veya sınır belirtilmedi. Öğretmen Konu Takibi → Hedef ve süre ayarları bölümünden okulun geldiği konuyu güncellemeli.');
+   throw new Error('Otomatik verilebilecek bitmemiş konu kalmadı. Biten konular Tekrar Sayfası’ndadır; yeni program kaydedilmedi.');
+  }
+  const phase=C.phase(state),goal=C.pace(state,data.target_week_start);
+  Object.assign(student,{exam_stage:phase||student.exam_stage,__learning_enabled:true,__learning_next:next,__allowed_subjects:next.map(t=>t.subject),__effective_excluded_subjects:state.student.excluded_subjects||[]});
+  return {...data,exam_stage:student.exam_stage,allowed_topics:next.map(t=>({id:t.id,subject:t.subject,topic:t.topic,sort_order:t.sort_order,exam_stage:t.exam_stage})),topic_progress:state.topics.map(t=>({topic_id:t.id,status:t.is_completed?'completed':'not_started',progress_percent:t.is_completed?100:0})),learning_goal:goal,main_exam_date:goal.target||data.main_exam_date};
+ };
+ const previousInspect=window.inspectWeeklyAIProgram;
+ window.inspectWeeklyAIProgram=function(raw,student,week,topics){
+  if(!student.__learning_enabled)return previousInspect.apply(this,arguments);
+  const expected=pairs(topics),rejected=[];
+  const canonical=(raw||[]).filter(t=>{if(!C.isWeekday(t.task_date)){rejected.push('Hafta sonuna çalışma eklenemez.');return false}return true}).map(t=>{
+   const row=expected.get(C.course(t.subject));if(!row)return t;
+   // AI saatleri yerleştirir; konu seçimi bitmemiş sıradaki katalog kaydından gelir.
+   return {...t,subject:row.subject,topic:row.topic,description:C.norm(t.topic)===C.norm(row.topic)?t.description:'Konu çalışması ve soru çözümü'};
+  });
+  const out=previousInspect(canonical,student,week,topics);out.errors.push(...rejected);return out;
+ };
+ const previousComplete=window.prepareCompleteWeeklyAIProgram;
+ window.prepareCompleteWeeklyAIProgram=async function(worker,token,payload,student,week,setStatus){
+  if(!student.__learning_enabled)return previousComplete.apply(this,arguments);
+  const topics=payload.student.allowed_topics||[];
+  const instruction='ZORUNLU: Yalnızca pazartesi-cuma günlerine çalışma koy; cumartesi ve pazar boş kalacak. Konuları yalnızca allowed_topics listesindeki ders-konu eşleşmeleriyle kullan. Tamamlanan konu verme ve listede olmayan konu uydurma. Hafta içi okul çıkışından sonra en az 90 dakika ara bırak; okul saatleriyle çakıştırma. Fotoğrafta okunamayan okul saatlerini varsayma. Günlük toplam çalışma öğrencinin daily_minutes değerini aşmasın. Konu bitirme durumunu günlük görev tamamlanmasından türetme.';
+  return previousComplete(worker,token,{...payload,coach_instruction:[payload.coach_instruction,instruction].filter(Boolean).join('\n'),required_topics:topics},student,week,setStatus);
+ };
+ const previousTemplate=window.prepareWeeklyProgramFromPrevious;
+ window.prepareWeeklyProgramFromPrevious=function(student,week,data){
+  if(!student.__learning_enabled)return previousTemplate.apply(this,arguments);
+  return previousTemplate(student,week,{...data,previous_week_tasks:(data.previous_week_tasks||[]).filter(t=>C.isWeekday(t.task_date))});
+ };
+ const previousValidate=window.validateAITasks;
+ window.validateAITasks=function(raw,student,week,plan){
+  return previousValidate(student.__learning_enabled?(raw||[]).filter(t=>C.isWeekday(t.task_date)):raw,student,week,plan);
+ };
+ const previousSave=window.saveCheckedWeeklyAITasks;
+ window.saveCheckedWeeklyAITasks=async function(student,week,tasks){
+  const fresh=await fetchLearningData(student.id),expected=pairs(C.next(fresh)),planned=pairs(student.__learning_next||[]),errors=[];
+  const totals=new Map();
+  for(const t of tasks||[]){
+   const next=expected.get(C.course(t.subject));
+   if(!next||C.norm(next.topic)!==C.norm(t.topic)||(planned.has(C.course(t.subject))&&planned.get(C.course(t.subject)).id!==next.id))errors.push('Konu sırası değişti veya konu bitti: '+t.subject+' / '+t.topic);
+   if(!C.isWeekday(t.task_date)||t.task_date<week||t.task_date>addDaysISO(week,4))errors.push('Çalışma pazartesi-cuma aralığında olmalı.');
+   const a=hmToMin(String(t.start_time).slice(0,5)),b=hmToMin(String(t.end_time).slice(0,5));
+   if(a==null||b==null||b<=a)errors.push('Geçersiz çalışma saati.');
+   totals.set(t.task_date,(totals.get(t.task_date)||0)+Math.max(0,b-a));
+  }
+  if(Number(fresh.student.daily_minutes)>0&&[...totals.values()].some(n=>n>Number(fresh.student.daily_minutes)))errors.push('Günlük çalışma süresi aşılıyor.');
+  if(!tasks?.length)errors.push('Programda geçerli çalışma yok.');
+  if(errors.length)throw new Error([...new Set(errors)].join(' ')+' Mevcut program değiştirilmedi; listeyi yenileyip tekrar oluşturun.');
+  return previousSave.apply(this,arguments);
+ };
+ window.getCatalogForStudent=async function(student){const data=await fetchLearningData(student.id),phase=C.phase(data);return data.topics.filter(t=>!t.is_completed&&!C.excluded(data,t)&&(!phase||t.exam_stage===phase));};
+ window.getProgressForAI=async function(id){const data=await fetchLearningData(id);return data.topics.map(t=>({topic_id:t.id,status:t.is_completed?'completed':'not_started',progress_percent:t.is_completed?100:0}));};
+ window.getLearningProgressRows=async function(id){return {data:await window.getProgressForAI(id),error:null}};
 })();
 
 </script>
