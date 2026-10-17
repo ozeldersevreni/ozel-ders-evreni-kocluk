@@ -233,7 +233,7 @@ async function loadTopicTracking(){const sid=document.getElementById('topicStude
 function renderTopicRows(){const f=document.getElementById('topicSubject').value,rows=topicCache.filter(x=>!f||x.subject===f),avg=rows.length?Math.round(rows.reduce((a,x)=>a+(x.progress?.progress_percent||0),0)/rows.length):0;document.getElementById('topicSummary').textContent=`${rows.length} konu • Ortalama ilerleme %${avg}`;document.getElementById('topicList').innerHTML=rows.map(x=>{let p=x.progress||{},pct=p.progress_percent||0,st=p.status||'not_started';return `<div class="topicRow"><b>${escapeHtml(x.subject)}</b><span>${escapeHtml(x.topic)}</span><div><div class="topicBar"><i style="width:${pct}%"></i></div><small>%${pct}</small></div><select onchange="saveTopicProgress('${x.id}',this.value,${pct})"><option value="not_started" ${st==='not_started'?'selected':''}>Başlanmadı</option><option value="in_progress" ${st==='in_progress'?'selected':''}>Çalışılıyor</option><option value="review_needed" ${st==='review_needed'?'selected':''}>Tekrar Gerekli</option><option value="completed" ${st==='completed'?'selected':''}>Tamamlandı</option></select><input type="number" min="0" max="100" value="${pct}" onchange="saveTopicProgress('${x.id}','${st}',this.value)" title="İlerleme %"></div>`}).join('')||'<b>Bu öğrenci için katalog bulunamadı.</b>'}
 async function saveTopicProgress(topicId,status,pct){const sid=document.getElementById('topicStudent').value,row=topicCache.find(x=>x.id===topicId),val=Math.max(0,Math.min(100,+pct||0));const payload={student_id:sid,topic_id:topicId,coach_id:row.coach_id,status,progress_percent:status==='completed'?100:val,last_studied_at:new Date().toISOString(),updated_at:new Date().toISOString()};const {error}=await sb.from('student_topic_progress').upsert(payload,{onConflict:'student_id,topic_id'});if(error)return alert('Konu ilerlemesi kaydedilemedi: '+error.message);await loadTopicTracking()}
 async function openMocks(){document.getElementById('mocksModal').classList.add('show');await fillFeatureStudents('mockStudent');document.getElementById('mockDate').value=new Date().toISOString().slice(0,10);await loadMocks()}
-async function loadMocks(){const sid=document.getElementById('mockStudent').value;if(!sid)return;const {data,error}=await sb.from('mock_exams').select('*').eq('student_id',sid).order('exam_date',{ascending:false});if(error)return document.getElementById('mockList').textContent=error.message;document.getElementById('mockList').innerHTML=`<table><thead><tr><th>Tarih</th><th>Deneme</th><th>D/Y/B</th><th>Net</th><th></th></tr></thead><tbody>${(data||[]).map(x=>`<tr><td>${x.exam_date}</td><td>${escapeHtml(x.exam_type)} • ${escapeHtml(x.exam_name)}</td><td>${x.total_correct}/${x.total_wrong}/${x.total_blank}</td><td><b>${x.total_net}</b></td><td><button class="danger small" onclick="deleteMock('${x.id}')">Sil</button></td></tr>`).join('')||'<tr><td colspan="5">Deneme kaydı yok.</td></tr>'}</tbody></table>`;document.getElementById('weeklyMocks').textContent=(data||[]).filter(x=>Date.now()-new Date(x.exam_date+'T12:00:00')<7*86400000).length}
+async function loadMocks(){const sid=document.getElementById('mockStudent').value;if(!sid)return;const {data,error}=await sb.from('mock_exams').select('*').eq('student_id',sid).order('exam_date',{ascending:false});if(error)return document.getElementById('mockList').textContent=error.message;document.getElementById('mockList').innerHTML=`<table><thead><tr><th>Tarih</th><th>Deneme</th><th>D/Y/B</th><th>Net</th><th></th></tr></thead><tbody>${(data||[]).map(x=>`<tr><td>${x.exam_date}</td><td>${escapeHtml(x.exam_type)} • ${escapeHtml(x.exam_name)}</td><td>${x.total_correct}/${x.total_wrong}/${x.total_blank}</td><td><b>${x.total_net}</b></td><td><button class="danger small" onclick="deleteMock('${x.id}')">Sil</button></td></tr>`).join('')||'<tr><td colspan="5">Deneme kaydı yok.</td></tr>'}</tbody></table>`;await window.refreshScopedDashboardStats()}
 async function saveMockExam(){const sid=document.getElementById('mockStudent').value,{data:s}=await sb.from('students').select('coach_id').eq('id',sid).single(),c=+document.getElementById('mockCorrect').value||0,w=+document.getElementById('mockWrong').value||0,b=+document.getElementById('mockBlank').value||0;const payload={student_id:sid,coach_id:s.coach_id,exam_type:document.getElementById('mockType').value.trim()||'Genel',exam_name:document.getElementById('mockName').value.trim()||'Deneme',exam_date:document.getElementById('mockDate').value||new Date().toISOString().slice(0,10),total_correct:c,total_wrong:w,total_blank:b,total_net:+(c-w/4).toFixed(2)};const {error}=await sb.from('mock_exams').insert(payload);if(error)return alert('Deneme kaydedilemedi: '+error.message);await loadMocks()}
 async function deleteMock(id){if(!confirm('Bu deneme kaydı silinsin mi?'))return;const {error}=await sb.from('mock_exams').delete().eq('id',id);if(error)return alert(error.message);await loadMocks()}
 async function openReports(){document.getElementById('reportsModal').classList.add('show');await fillFeatureStudents('reportStudent');await loadReport()}
@@ -487,7 +487,7 @@ async function generateAIPlan(){
   closeModal('aiPlanModal');aiTargetWeek=null;document.getElementById('aiPhoto').value='';await refreshPlanCount();await loadScheduleForStudent();alert(st.full_name+' için '+trDateFinal(week)+' haftası programı taslak olarak oluşturuldu. Kontrol edip Yayınla butonuna basın.');
  }catch(e){status.innerHTML='<b>Durum:</b> Program oluşturma işlemi tamamlanamadı';alert('Program oluşturulamadı: '+(e.message||e))}
 }
-async function loadMocks(){const sid=document.getElementById('mockStudent').value;if(!sid)return;const {data,error}=await sb.from('mock_exams').select('*').eq('student_id',sid).order('exam_date',{ascending:false});if(error)return document.getElementById('mockList').textContent=error.message;document.getElementById('mockList').innerHTML=`<table><thead><tr><th>Tarih</th><th>Deneme</th><th>D/Y/B</th><th>Net</th><th>İşlem</th></tr></thead><tbody>${(data||[]).map(x=>`<tr><td>${trDateFinal(x.exam_date)}</td><td>${escapeHtml((x.exam_type||'').toUpperCase())} • ${escapeHtml(x.exam_name)}</td><td>${x.total_correct}/${x.total_wrong}/${x.total_blank}</td><td><b>${x.total_net}</b></td><td><button class="secondary small" onclick='editMockFinal(${JSON.stringify(x)})'>Düzenle</button> <button class="danger small" onclick="deleteMock('${x.id}')">Sil</button></td></tr>`).join('')||'<tr><td colspan="5">Deneme kaydı yok.</td></tr>'}</tbody></table>`;document.getElementById('weeklyMocks').textContent=(data||[]).filter(x=>Date.now()-new Date(x.exam_date+'T12:00:00')<7*86400000).length}
+async function loadMocks(){const sid=document.getElementById('mockStudent').value;if(!sid)return;const {data,error}=await sb.from('mock_exams').select('*').eq('student_id',sid).order('exam_date',{ascending:false});if(error)return document.getElementById('mockList').textContent=error.message;document.getElementById('mockList').innerHTML=`<table><thead><tr><th>Tarih</th><th>Deneme</th><th>D/Y/B</th><th>Net</th><th>İşlem</th></tr></thead><tbody>${(data||[]).map(x=>`<tr><td>${trDateFinal(x.exam_date)}</td><td>${escapeHtml((x.exam_type||'').toUpperCase())} • ${escapeHtml(x.exam_name)}</td><td>${x.total_correct}/${x.total_wrong}/${x.total_blank}</td><td><b>${x.total_net}</b></td><td><button class="secondary small" onclick='editMockFinal(${JSON.stringify(x)})'>Düzenle</button> <button class="danger small" onclick="deleteMock('${x.id}')">Sil</button></td></tr>`).join('')||'<tr><td colspan="5">Deneme kaydı yok.</td></tr>'}</tbody></table>`;await window.refreshScopedDashboardStats()}
 function editMockFinal(x){editingMockId=x.id;meType.value=x.exam_type||'';meDate.value=x.exam_date||'';meName.value=x.exam_name||'';meCorrect.value=x.total_correct||0;meWrong.value=x.total_wrong||0;meBlank.value=x.total_blank||0;document.getElementById('mockEditModal').classList.add('show')}
 async function saveMockEdit(){if(!editingMockId)return;const c=+meCorrect.value||0,w=+meWrong.value||0,b=+meBlank.value||0;const {error}=await sb.from('mock_exams').update({exam_type:meType.value.trim()||'Genel',exam_date:meDate.value,exam_name:meName.value.trim()||'Deneme',total_correct:c,total_wrong:w,total_blank:b,total_net:+(c-w/4).toFixed(2)}).eq('id',editingMockId);if(error)return alert('Deneme güncellenemedi: '+error.message);closeModal('mockEditModal');editingMockId=null;await loadMocks();alert('Deneme güncellendi.')}
 // Real students never see coach-return control; admin/coach preview still can.
@@ -1270,7 +1270,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
     else if(currentProfile?.role==='coach') rows=rows.filter(x=>String(x.coach_id||'')===String(currentProfile.id));
 
     const ids=rows.map(x=>x.student_user_id).filter(Boolean);
-    if(ids.length && currentProfile?.role!=='admin'){
+    if(ids.length && (currentProfile?.role!=='admin'||previewId)){
       const pr=await sb.from('profiles').select('id,status').in('id',ids);
       if(!pr.error){const active=new Set((pr.data||[]).filter(p=>p.status==='active').map(p=>p.id));rows=rows.filter(x=>!x.student_user_id||active.has(x.student_user_id));}
     }
@@ -3710,3 +3710,39 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
 @media(max-width:340px){#coach #adminCountdown #adminLiveDate,#student #studentLiveClockPanel #studentLiveDate{font-size:13px!important}#coach #adminCountdown #adminLiveTime,#student #studentLiveClockPanel #studentLiveTime{font-size:19px!important}}
 
 </style>
+
+<script id="scopedDashboardStats20261017">
+(function(){
+ const E=id=>document.getElementById(id);let flight=null,revision=0;
+ const fields=['count','activePrograms','avgCompletion','weeklyMocks'];
+ function scope(){const p=currentProfile;if(!p||!['admin','coach'].includes(p.role))return null;const coach=p.role==='coach'?p.id:window.adminTeacherPreviewId||null,school=coach?null:window.ODEVSchoolContext||null;return {user:p.id,role:p.role,coach,school,key:JSON.stringify([p.id,p.role,coach,school])};}
+ function paint(values){for(const id of fields){const e=E(id);if(e){e.textContent=values[id];e.removeAttribute('title');}}}
+ async function read(factory){const r=await integrityReadAll(factory);if(r.error)throw r.error;return r.data||[];}
+ async function studentsFor(s){
+  let rows=await read(()=>{let q=sb.from('students').select('id,student_user_id').order('id');return s.coach?q.eq('coach_id',s.coach):s.school?q.eq('school_id',s.school):q.is('school_id',null)});
+  // Match the real teacher's list, including unlinked pupils and excluding inactive linked accounts.
+  if(s.coach){const linked=rows.map(x=>x.student_user_id).filter(Boolean),active=new Set();for(let i=0;i<linked.length;i+=100){const part=await read(()=>sb.from('profiles').select('id,status').in('id',linked.slice(i,i+100)).order('id'));for(const p of part)if(p.status==='active')active.add(p.id);}rows=rows.filter(x=>!x.student_user_id||active.has(x.student_user_id));}
+  return rows;
+ }
+ window.refreshScopedDashboardStats=function(){
+  const s=scope();if(!s)return Promise.resolve();if(flight?.key===s.key)return flight.promise;
+  const ticket=++revision;paint({count:'…',activePrograms:'…',avgCompletion:'…',weeklyMocks:'…'});
+  const work=(async()=>{
+   try{const students=await studentsFor(s),ids=students.map(x=>x.id);let total=0,done=0,plans=0,mocks=0;const week=mondayISO(),end=addDaysISO(week,6);
+    for(let i=0;i<ids.length;i+=100){const batch=ids.slice(i,i+100);const [tasks,programs,exams]=await Promise.all([
+     read(()=>sb.from('study_tasks').select('id,status').in('student_id',batch).order('id')),
+     read(()=>sb.from('study_plans').select('id,status').in('student_id',batch).in('status',['approved','published']).order('id')),
+     read(()=>sb.from('mock_exams').select('id').in('student_id',batch).gte('exam_date',week).lte('exam_date',end).order('id'))
+    ]);total+=tasks.length;done+=tasks.filter(x=>x.status==='completed').length;plans+=programs.length;mocks+=exams.length;}
+    if(ticket!==revision||scope()?.key!==s.key)return;
+    paint({count:String(ids.length),activePrograms:String(plans),avgCompletion:'%'+(total?Math.round(done*100/total):0),weeklyMocks:String(mocks)});
+   }catch(e){if(ticket!==revision||scope()?.key!==s.key)return;paint({count:'—',activePrograms:'—',avgCompletion:'—',weeklyMocks:'—'});for(const id of fields)E(id)?.setAttribute('title','Özet alınamadı: '+(e.message||String(e)));}
+   finally{if(flight?.ticket===ticket)flight=null;}
+  })();flight={key:s.key,ticket,promise:work};return work;
+ };
+ window.refreshCompletionRate=window.refreshScopedDashboardStats;window.refreshPlanCount=window.refreshScopedDashboardStats;
+ const load=window.loadCloudStudents;window.loadCloudStudents=async function(){const r=await load.apply(this,arguments);await refreshScopedDashboardStats();return r;};
+ sb.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){revision++;flight=null;paint({count:'0',activePrograms:'0',avgCompletion:'%0',weeklyMocks:'0'});}});
+})();
+
+</script>
