@@ -3151,17 +3151,19 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
   const p=C.pace(data,localDate());
   if(!p.remaining)return '<div class="learningPace">✓ Bu listedeki bütün konular bitti. Tekrar Sayfası’ndan devam edebilirsin.</div>';
   if(!p.target)return '<div class="learningPace">'+p.remaining+' konu kaldı. Süre hesabı için '+(data.student.program_type==='ARA'?'öğretmen dönem/yıl sonu hedefi belirlemeli.':'sınav veya hedef tarihi belirlenmeli.')+'</div>';
-  let text=p.remaining+' konu kaldı • Hedef: '+esc(date(p.target))+'<br>Yeni konular için hedef bitiş: '+esc(date(p.cutoff))+' • Tekrar/deneme için '+Number(data.settings.reserve_days??21)+' gün ayrıldı.';
-  if(p.weeks>0)text+='<br>Gerekli ortalama: haftada '+p.topicsPerWeek.toLocaleString('tr-TR',{maximumFractionDigits:1})+' konu.<br><small>Bu hedef sabit değildir. Yalnızca Konuyu bitirdim işaretlenen konular düşülür; bitmeyenler kalan listede tutulur.</small>';
-  else text+='<br>Yeni konu bitirme hedefinin tarihi geçti.';
-  if(p.weeks>0&&p.weeklyTargets?.length)text+='<br>'+p.weeklyTargets.map(g=>esc(g.exam_stage+' '+g.subject)+': bu hafta '+g.target+' konu hedefi').join('<br>');
-  if(p.observedPerWeek!=null)text+='<br>Son izlenen '+p.observedDays+' çalışma gününde '+p.completedRecently+' konu bitti; gerçekleşen hız haftada '+p.observedPerWeek.toLocaleString('tr-TR',{maximumFractionDigits:1})+' konu.';
-  else text+='<br>⚠ Yetişme tahmini için en az 5 tam çalışma günü verisi gerekiyor; henüz yetişeceği doğrulanmış değil.';
-  if(p.behind)text+='<br><b>⚠ '+(p.weeks<=0?'Yeni konuları bitirme tarihi geçti.':'Gerçekleşen konu bitirme hızı hedefin altında. Hedef tarih gelmeden çalışma planını gözden geçirin.')+'</b>';
-  if(p.needsUpdates)text+='<br><b>Bu haftanın hedefi bazı derslerde birden fazla konu gerektiriyor.</b> Program önce sıradaki bitmemiş konuyu verir. Konuyu bitirdim işaretlendikten sonra yeni konu için program güncellenmelidir. Yayınlanmış program kendiliğinden değişmez.';
-  if(data.student.program_type==='YKS')text+='<br>Program aşaması: '+esc(C.phase(data))+' • TYT bitmeden sonraki aşamaya geçilmez.';
-  if(data.student.program_type==='ARA'&&!data.subject_settings.some(s=>s.frontier_topic_id))text+='<br>Otomatik program için öğretmen her derste okulun geldiği konuyu belirlemeli.';
-  return '<div class="learningPace '+(p.behind||p.weeks<=0?'warning':'')+'">'+text+'<br><small>Haftalık hedef kalan konulardan yukarı yuvarlanır; hiçbir konu hesaptan çıkarılmaz. Bu sayılar konu bitirme hedefidir, yetişme garantisi vermez; konuların uzunluğu farklı olabilir. Hesap pazartesi–cuma çalışma günlerini kullanır.</small></div>';
+  const weekly=p.weeks>0?p.topicsPerWeek.toLocaleString('tr-TR',{maximumFractionDigits:1})+' konu':'Tarih geçti';
+  let details='<p>Hedef tarih: <b>'+esc(date(p.target))+'</b> • Tekrar/deneme için '+Number(data.settings.reserve_days??21)+' gün ayrıldı.</p>';
+  details+='<p>Haftalık hedef, tamamlanan konulara göre güncellenir. Yalnızca Konuyu bitirdim işaretlenen konular düşülür; bitmeyenler kalan listede tutulur.</p>';
+  if(p.weeks>0&&p.weeklyTargets?.length)details+='<ul>'+p.weeklyTargets.map(g=>'<li>'+esc(g.exam_stage+' '+g.subject)+': bu hafta <b>'+g.target+' konu</b></li>').join('')+'</ul>';
+  if(p.observedPerWeek!=null)details+='<p>Son izlenen '+p.observedDays+' çalışma gününde '+p.completedRecently+' konu bitti; gerçekleşen hız haftada '+p.observedPerWeek.toLocaleString('tr-TR',{maximumFractionDigits:1})+' konu.</p>';
+  else details+='<p>Yetişme tahmini için en az 5 tam çalışma günü verisi gerekiyor; henüz yetişeceği doğrulanmış değil.</p>';
+  if(p.behind)details+='<p><b>⚠ '+(p.weeks<=0?'Yeni konuları bitirme tarihi geçti.':'Gerçekleşen konu bitirme hızı hedefin altında. Hedef tarih gelmeden çalışma planını gözden geçirin.')+'</b></p>';
+  if(p.needsUpdates)details+='<p>Bu haftanın hedefi bazı derslerde birden fazla konu gerektiriyor. Program önce sıradaki bitmemiş konuyu verir. Konuyu bitirdim işaretlendikten sonra yeni konu için program güncellenmelidir. Yayınlanmış program kendiliğinden değişmez.</p>';
+  if(data.student.program_type==='YKS')details+='<p>Program aşaması: '+esc(C.phase(data))+' • TYT bitmeden sonraki aşamaya geçilmez.</p>';
+  if(data.student.program_type==='ARA'&&!data.subject_settings.some(s=>s.frontier_topic_id))details+='<p>Otomatik program için öğretmen her derste okulun geldiği konuyu belirlemeli.</p>';
+  details+='<p><small>Haftalık hedef kalan konulardan yukarı yuvarlanır; hiçbir konu hesaptan çıkarılmaz. Bu sayılar konu bitirme hedefidir, yetişme garantisi vermez; konuların uzunluğu farklı olabilir. Hesap pazartesi–cuma çalışma günlerini kullanır.</small></p>';
+  const notice=p.behind?'⚠ '+(p.weeks<=0?'Yeni konu bitirme tarihi geçti.':'Konu bitirme hızı hedefin altında.'):(p.observedPerWeek==null?'Yetişme tahmini: veri bekleniyor.':'');
+  return '<div class="learningPace '+(p.behind||p.weeks<=0?'warning':'')+'"><div class="paceSummary"><div><small>Kalan konu</small><strong>'+p.remaining+'</strong></div><div><small>Yeni konu bitiş hedefi</small><strong>'+esc(date(p.cutoff))+'</strong></div><div><small>Haftalık hedef</small><strong>'+esc(weekly)+'</strong></div></div>'+(notice?'<p class="paceNotice">'+notice+'</p>':'')+'<details class="paceDetails"><summary>Ders hedefleri ve detaylar</summary><div>'+details+'</div></details></div>';
  }
  function settings(data){
   if(!data.can_manage)return '';
@@ -3746,3 +3748,20 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
 })();
 
 </script>
+
+<style id="paceSummary20261017">
+.learningPace .paceSummary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:4px 2px}
+.learningPace .paceSummary>div{min-width:0}
+.learningPace .paceSummary small{display:block;color:#526780;font-size:12px;line-height:1.5;margin-bottom:4px}
+.learningPace .paceSummary strong{display:block;font-size:16px;line-height:1.5;overflow-wrap:anywhere}
+.learningPace .paceNotice{font-size:12px;margin:10px 2px;color:inherit}
+.learningPace .paceDetails{border-top:1px solid #dce5ef;margin-top:12px;padding-top:4px}
+.learningPace .paceDetails summary{cursor:pointer;font-weight:650;color:#225994;padding:9px 2px;min-height:44px;font-size:13px}
+.learningPace .paceDetails summary:focus-visible{outline:2px solid #1769e0;outline-offset:2px;border-radius:4px}
+.learningPace .paceDetails>div{padding:0 2px 6px;overflow-wrap:anywhere}
+.learningPace .paceDetails p{margin:10px 0;font-size:13px}
+.learningPace .paceDetails ul{padding-left:20px;font-size:13px}
+.learningPace .paceDetails li{margin:7px 0}
+@media(max-width:540px){.learningPace .paceSummary{grid-template-columns:1fr;gap:10px}.learningPace .paceSummary>div{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.learningPace .paceSummary small{margin:0;flex:1}.learningPace .paceSummary strong{font-size:14px;text-align:right;flex:1}.learningPace .paceDetails summary{font-size:13px}}
+
+</style>
