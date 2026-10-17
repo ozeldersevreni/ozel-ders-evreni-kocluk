@@ -2930,22 +2930,25 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
 
 </script>
 
-<script id="programTopicHistory20261012">
+<script id="programTopicCalendar20261017">
 (function(){
   const center=document.querySelector('#studentCenterModal .studentCenterActions');
-  if(!center)return;
-  const allowed=()=>['admin','coach'].includes(currentProfile?.role);
-  const button=document.createElement('button');button.id='programHistoryBtn';button.type='button';button.className='secondary';button.textContent='📚 Program ve Konu Geçmişi';button.hidden=true;center.appendChild(button);
+  const studentSection=document.querySelector('#studentTopicSummary')?.closest('.studentSection');
+  if(!center&&!studentSection)return;
+  const allowed=()=>['admin','coach','student'].includes(currentProfile?.role);
+  const button=document.createElement('button');button.id='programHistoryBtn';button.type='button';button.className='secondary';button.textContent='📅 Müfredat Takvimi';button.hidden=true;if(center)center.appendChild(button);
+  const studentButton=document.createElement('button');studentButton.id='studentCurriculumCalendarBtn';studentButton.type='button';studentButton.className='secondary small';studentButton.textContent='📅 Müfredat Takvimim';if(studentSection)studentSection.querySelector('.top')?.appendChild(studentButton);
   const modal=document.createElement('div');modal.id='programHistoryModal';modal.className='modal';modal.style.zIndex='11000';
-  modal.innerHTML=`<div class="modalbox" style="width:min(1050px,96vw)"><div class="studentCenterHead"><div><h2 style="margin:0" id="programHistoryTitle">Program ve Konu Geçmişi</h2><p style="margin:8px 0 0">Yayınlanan görevler; silinen programların kayıtları da korunur.</p></div><button type="button" class="secondary" id="programHistoryClose">Kapat</button></div><div class="formgrid"><div class="field"><label for="historyFrom">Başlangıç tarihi</label><input id="historyFrom" type="date"></div><div class="field"><label for="historyTo">Bitiş tarihi</label><input id="historyTo" type="date"></div><div class="field"><label for="historySubject">Ders</label><select id="historySubject"><option value="">Tüm dersler</option></select></div><div class="field"><label for="historySearch">Konu ara</label><input id="historySearch" type="search" placeholder="Konu veya açıklama"></div></div><div class="toolbar"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="historyRevisions" style="width:20px;min-height:20px">Eski konu düzenlemelerini de göster</label><button type="button" class="secondary" id="historyClear">Filtreleri temizle</button><button type="button" class="secondary" id="historyRefresh">Yenile</button></div><p id="historyStatus" role="status" aria-live="polite"></p><div id="historyContent"></div></div>`;
+  modal.innerHTML=`<div class="modalbox" style="width:min(1050px,96vw)"><div class="studentCenterHead"><div><h2 style="margin:0" id="programHistoryTitle">Program ve Konu Geçmişi</h2><p style="margin:8px 0 0">Yayınlanan görevler; silinen programların kayıtları da korunur.</p></div><button type="button" class="secondary" id="programHistoryClose">Kapat</button></div><div class="learningTools" style="margin:12px 0"><button type="button" class="primary" id="historyViewCurriculum">Müfredat listesi ve haftalar</button><button type="button" class="secondary" id="historyViewProgram">Yayımlanan program kayıtları</button></div><div class="formgrid"><div class="field"><label for="historyFrom">Başlangıç tarihi</label><input id="historyFrom" type="date"></div><div class="field"><label for="historyTo">Bitiş tarihi</label><input id="historyTo" type="date"></div><div class="field"><label for="historySubject">Ders</label><select id="historySubject"><option value="">Tüm dersler</option></select></div><div class="field"><label for="historySearch">Konu ara</label><input id="historySearch" type="search" placeholder="Konu veya açıklama"></div></div><div class="toolbar"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="historyRevisions" style="width:20px;min-height:20px">Eski konu düzenlemelerini de göster</label><button type="button" class="secondary" id="historyClear">Filtreleri temizle</button><button type="button" class="secondary" id="historyRefresh">Yenile</button></div><p id="historyStatus" role="status" aria-live="polite"></p><div id="historyContent"></div></div>`;
   modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-labelledby','programHistoryTitle');
   document.body.appendChild(modal);
   const E=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  let selected=null,rows=[],ticket=0,loading=false;
+  let selected=null,rows=[],catalogData=null,ticket=0,loading=false,mode='curriculum';
   const date=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v))?new Date(v+'T12:00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric',weekday:'long'}):String(v||'—');
   function chosenStudent(){let id=null;try{id=centerStudentId}catch(_){}return id||window.activeCenterStudentId||null}
-  function reset(){rows=[];E('programHistoryTitle').textContent='Program ve Konu Geçmişi';E('historyContent').innerHTML='';E('historySubject').innerHTML='<option value="">Tüm dersler</option>';for(const id of ['historyFrom','historyTo','historySearch'])E(id).value='';E('historyRevisions').checked=false;}
-  function render(){
+  function ownStudent(){try{return activeStudentId||window.activeStudentId||null}catch(_){return window.activeStudentId||null}}
+  function reset(){rows=[];catalogData=null;mode='curriculum';E('programHistoryTitle').textContent='Müfredat Takvimi';E('historyContent').innerHTML='';E('historySubject').innerHTML='<option value="">Tüm dersler</option>';for(const id of ['historyFrom','historyTo','historySearch'])E(id).value='';E('historyRevisions').checked=false;}
+  function renderHistory(){
     if(!allowed())return;
     const from=E('historyFrom').value,to=E('historyTo').value,subject=E('historySubject').value,search=E('historySearch').value.trim().toLocaleLowerCase('tr-TR');
     if(from&&to&&from>to){E('historyStatus').textContent='Başlangıç tarihi bitiş tarihinden sonra olamaz.';E('historyContent').innerHTML='';return;}
@@ -2963,34 +2966,55 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
     }
     E('historyContent').innerHTML=html+'</tbody></table></div>';
   }
+  const norm=v=>String(v??'').normalize('NFKC').toLocaleLowerCase('tr-TR').replace(/\s+/g,' ').trim();
+  function weekLabel(v){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(v||'')))return String(v||'—');const d=new Date(v+'T12:00:00');const end=new Date(d);end.setDate(end.getDate()+6);const f=x=>x.toLocaleDateString('tr-TR',{day:'numeric',month:'short'});return f(d)+' – '+f(end);}
+  function renderCurriculum(){
+    if(!allowed())return;
+    const from=E('historyFrom').value,to=E('historyTo').value,subject=E('historySubject').value,search=norm(E('historySearch').value);
+    if(from&&to&&from>to){E('historyStatus').textContent='Başlangıç tarihi bitiş tarihinden sonra olamaz.';E('historyContent').innerHTML='';return;}
+    if(!catalogData?.topics){E('historyStatus').textContent='Müfredat yüklenemedi.';E('historyContent').innerHTML='';return;}
+    const latest=new Map();for(const r of rows){const key=r.source_plan_id+':'+r.source_task_id;const prior=latest.get(key);if(!prior||r.revision>prior.revision)latest.set(key,r);}
+    const schedule=new Map();for(const r of latest.values()){const key=norm(r.subject)+'|'+norm(r.topic);if(!key||key==='|')continue;if(!schedule.has(key))schedule.set(key,[]);schedule.get(key).push(r);}
+    let topics=catalogData.topics.filter(t=>(!subject||t.subject===subject)&&(!search||norm(t.subject+' '+t.topic).includes(search)));
+    const bySubject=new Map();for(const t of topics){if(!bySubject.has(t.subject))bySubject.set(t.subject,[]);bySubject.get(t.subject).push(t);}
+    let html='';for(const [sub,items] of [...bySubject.entries()].sort((a,b)=>a[0].localeCompare(b[0],'tr'))){html+='<h3>'+esc(sub)+'</h3><div class="curriculumCalendarList">';for(const t of items){const all=schedule.get(norm(t.subject)+'|'+norm(t.topic))||[];const dated=all.filter(r=>(!from||r.task_date>=from)&&(!to||r.task_date<=to)).sort((a,b)=>String(a.task_date).localeCompare(String(b.task_date))||String(a.start_time||'').localeCompare(String(b.start_time||'')));const done=!!t.is_completed,label=done?(Number(t.review_count||0)>0?'✓ Bitti • '+Number(t.review_count)+' tekrar':'✓ Bitti'):'Devam ediyor';let dates=dated.length?'<div class="curriculumCalendarDates">'+dated.map(r=>'<span class="curriculumCalendarDate">'+esc(date(r.task_date))+'<br><small>'+esc(weekLabel(r.week_start))+' haftası'+(r.start_time?' • '+esc(String(r.start_time).slice(0,5)):'')+'</small></span>').join('')+'</div>':all.length?'Bu tarih filtresinde program kaydı yok.':'Henüz yayımlanmış programa eklenmedi.';html+='<article class="curriculumCalendarRow '+(done?'isDone':'')+'"><div><b>'+esc(t.topic)+'</b><small class="curriculumCalendarState">'+esc(label)+'</small></div><div>'+dates+'</div></article>'; }html+='</div>';}
+    E('historyStatus').textContent=topics.length+' müfredat konusu • Tarihler yalnızca yayımlanmış programlardan alınır.';
+    E('historyContent').innerHTML=html||'<div class="empty">Bu filtrelerde müfredat konusu bulunamadı.</div>';
+  }
+  function render(){if(mode==='curriculum')renderCurriculum();else renderHistory();E('historyViewCurriculum').className=mode==='curriculum'?'primary':'secondary';E('historyViewProgram').className=mode==='history'?'primary':'secondary';}
   async function load(){
     if(!allowed()||!selected)return;
     const mine=++ticket,studentId=selected;loading=true;rows=[];E('historyContent').innerHTML='';E('historyStatus').textContent='Geçmiş yükleniyor…';E('historyRefresh').disabled=true;
     try{
-      let q=sb.from('students').select('id,full_name,coach_id').eq('id',studentId);if(currentProfile.role==='coach')q=q.eq('coach_id',currentProfile.id);
-      const s=await q.maybeSingle();if(s.error)throw s.error;if(!s.data)throw new Error('Bu öğrencinin geçmişini görüntüleme yetkiniz yok.');
-      if(mine!==ticket||!allowed())return;E('programHistoryTitle').textContent=(s.data.full_name||'Öğrenci')+' — Program ve Konu Geçmişi';
+      let q=sb.from('students').select('id,full_name,coach_id,student_user_id').eq('id',studentId);if(currentProfile.role==='coach')q=q.eq('coach_id',currentProfile.id);if(currentProfile.role==='student')q=q.eq('student_user_id',currentProfile.id);
+      const s=await q.maybeSingle();if(s.error)throw s.error;if(!s.data)throw new Error('Bu öğrencinin müfredat takvimini görüntüleme yetkiniz yok.');
+      if(mine!==ticket||!allowed())return;E('programHistoryTitle').textContent=(currentProfile.role==='student'?'Müfredat Takvimim':(s.data.full_name||'Öğrenci')+' — Müfredat Takvimi');
+      if(typeof window.fetchLearningData!=='function')throw new Error('Müfredat listesi yüklenemedi.');catalogData=await window.fetchLearningData(studentId);if(mine!==ticket||!allowed())return;
+      if(currentProfile.role==='student')E('historyRevisions').closest('label').hidden=true;else E('historyRevisions').closest('label').hidden=false;
       const all=[];for(let offset=0;;offset+=500){
         const r=await sb.from('program_topic_history').select('id,source_plan_id,source_task_id,revision,week_start,task_date,start_time,end_time,subject,topic,description,target_questions,task_status,recorded_at,source_deleted').eq('student_id',studentId).order('id',{ascending:true}).range(offset,offset+499);
         if(r.error)throw r.error;if(mine!==ticket||!allowed())return;all.push(...(r.data||[]));if((r.data||[]).length<500)break;
       }
       rows=all;const current=E('historySubject').value;const subjects=[...new Set(rows.map(r=>r.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
-      E('historySubject').innerHTML='<option value="">Tüm dersler</option>'+subjects.map(s=>'<option value="'+esc(s)+'">'+esc(s)+'</option>').join('');if(subjects.includes(current))E('historySubject').value=current;render();
+      const allSubjects=[...new Set([...(catalogData?.topics||[]).map(t=>t.subject),...subjects].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));E('historySubject').innerHTML='<option value="">Tüm dersler</option>'+allSubjects.map(s=>'<option value="'+esc(s)+'">'+esc(s)+'</option>').join('');if(allSubjects.includes(current))E('historySubject').value=current;render();
     }catch(e){if(mine===ticket&&allowed()){rows=[];E('historyContent').innerHTML='';E('historyStatus').textContent='Geçmiş alınamadı: '+(e.message||String(e))+' — Geçmiş SQL kurulumunu kontrol edin.';}}
     finally{if(mine===ticket){loading=false;E('historyRefresh').disabled=false;}}
   }
-  window.openProgramTopicHistory=async function(id){if(!allowed())return alert('Bu bölüm yalnızca yönetici ve öğretmene açıktır.');if(!id)return alert('Öğrenci seçilemedi.');selected=id;reset();modal.classList.add('show');await load();};
+  window.openProgramTopicHistory=async function(id){if(!allowed())return alert('Bu bölüm giriş yapan kullanıcıya açık değildir.');if(currentProfile.role==='student'&&id!==ownStudent())return alert('Yalnızca kendi müfredat takviminizi görebilirsiniz.');if(!id)return alert('Öğrenci seçilemedi.');selected=id;reset();modal.classList.add('show');await load();};
   const previousCenter=window.openStudentCenter;
-  window.openStudentCenter=async function(){button.hidden=!allowed();const r=await previousCenter.apply(this,arguments);button.hidden=!allowed();return r;};
+  if(center&&typeof previousCenter==='function')window.openStudentCenter=async function(){button.hidden=!['admin','coach'].includes(currentProfile?.role);const r=await previousCenter.apply(this,arguments);button.hidden=!['admin','coach'].includes(currentProfile?.role);return r;};
   button.addEventListener('click',()=>window.openProgramTopicHistory(chosenStudent()));
+  studentButton.hidden=false;studentButton.addEventListener('click',()=>window.openProgramTopicHistory(ownStudent()));
+  E('historyViewCurriculum').addEventListener('click',()=>{mode='curriculum';render()});E('historyViewProgram').addEventListener('click',()=>{mode='history';render()});
   E('programHistoryClose').addEventListener('click',()=>{ticket++;loading=false;modal.classList.remove('show');});
   for(const id of ['historyFrom','historyTo','historySubject','historyRevisions'])E(id).addEventListener('change',()=>{if(!loading)render()});E('historySearch').addEventListener('input',()=>{if(!loading)render()});
   E('historyClear').addEventListener('click',()=>{for(const id of ['historyFrom','historyTo','historySearch'])E(id).value='';E('historySubject').value='';E('historyRevisions').checked=false;if(!loading)render();});
   E('historyRefresh').addEventListener('click',load);
-  sb.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){ticket++;selected=null;rows=[];reset();button.hidden=true;modal.classList.remove('show');}});
+  sb.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){ticket++;selected=null;rows=[];catalogData=null;reset();button.hidden=true;studentButton.hidden=true;modal.classList.remove('show');}});
 })();
 
 </script>
+<style id="curriculumCalendarStyles20261017">.curriculumCalendarList{display:grid;gap:8px;margin:8px 0 18px}.curriculumCalendarRow{display:grid;grid-template-columns:minmax(180px,1fr) minmax(220px,1.2fr);gap:12px;padding:12px;border:1px solid #e3eaf2;border-radius:11px;background:#fff}.curriculumCalendarRow.isDone{background:#effaf3;border-color:#c7ebd3}.curriculumCalendarRow>div:first-child{display:grid;gap:5px}.curriculumCalendarState{font-size:12px;color:#5d6b82}.curriculumCalendarRow.isDone .curriculumCalendarState{color:#168044;font-weight:700}.curriculumCalendarDates{display:flex;gap:7px;flex-wrap:wrap}.curriculumCalendarDate{padding:7px 9px;background:#eef5ff;border-radius:8px;font-size:12px}.curriculumCalendarDate small{color:#52627a}@media(max-width:650px){.curriculumCalendarRow{grid-template-columns:1fr;gap:8px}}</style>
 
 <script id="teacherAccountInfo20261012">
 (function(){
