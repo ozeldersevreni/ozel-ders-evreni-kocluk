@@ -3374,13 +3374,50 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
  E('schoolAssignCancel').onclick=()=>{assignment=null;assignModal.classList.remove('show')};
  const nav=document.querySelector('#appSidebar .nav');if(nav){const b=document.createElement('button');b.id='schoolNav';b.type='button';b.textContent='🏫 Okullar';b.style.display='none';b.onclick=()=>openSchools();nav.appendChild(b)}
  const banner=document.createElement('div');banner.id='schoolContextBanner';banner.className='manualNotice';banner.hidden=true;E('coach')?.querySelector('.grid')?.before(banner);
+
+ // The admin homepage mirrors the school directory; the sidebar manager remains available.
+ const home=document.createElement('section');home.id='schoolHomePanel';home.className='panel';home.hidden=true;home.style.margin='16px 0';
+ home.innerHTML='<div class="schoolHomeHead"><h2>🏫 Okullar</h2><div class="schoolActions"><button class="secondary small" data-school-home="refresh">Yenile</button><button class="primary small" data-school-home="manage">Okulları yönet</button></div></div><div id="schoolHomeList" aria-live="polite">Yükleniyor…</div><p id="schoolHomeMessage" role="status"></p>';
+ E('coach')?.querySelector('.grid')?.before(home);
+ const individualHeading=document.createElement('h2');individualHeading.id='schoolIndividualHeading';individualHeading.textContent='👤 Bireysel';individualHeading.hidden=true;E('coach')?.querySelector('.grid')?.before(individualHeading);
+ style.textContent+='.schoolHomeHead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.schoolHomeHead h2{margin:0}.schoolHomeItem{border:1px solid #dce5ef;border-radius:12px;margin:12px 0;background:#f8fbff;overflow:hidden}.schoolHomeItem>summary{cursor:pointer;padding:16px;overflow-wrap:anywhere;font-weight:700;min-height:48px}.schoolHomeMembers{padding:0 16px 16px}.schoolHomeMembers ul{list-style:none;margin:8px 0;padding:0}.schoolHomeMembers li{padding:10px 0;border-bottom:1px solid #e1e8f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.schoolHomeMembers h3{margin:16px 0 8px}.schoolHomeCount{font-weight:400;color:#5b687b;margin-left:8px}.schoolHomeMembers .schoolMuted{margin-left:auto}body.teacherPreviewMode #schoolHomePanel,body.coachRole #schoolHomePanel,body.realStudentRole #schoolHomePanel{display:none!important}[hidden]#schoolHomePanel,[hidden]#schoolIndividualHeading{display:none!important}';
+ let homeFlight=null,homeRequest=0;
+ const homeAllowed=()=>admin()&&!window.adminTeacherPreviewId&&!document.body.classList.contains('teacherPreviewMode')&&!window.ODEVSchoolContext;
+ function renderHome(){
+  if(!homeAllowed())return;
+  const expanded=new Set([...home.querySelectorAll('details[open]')].map(x=>x.getAttribute('data-school-id')));
+  E('schoolHomeList').innerHTML=schools.map(s=>{
+   const teachers=(directory.teachers||[]).filter(t=>t.school_id===s.id),students=(directory.students||[]).filter(st=>st.school_id===s.id),names=new Map(teachers.map(t=>[t.id,t.full_name||'Öğretmen']));
+   return '<details class="schoolHomeItem" data-school-id="'+esc(s.id)+'" '+(expanded.has(s.id)?'open':'')+'><summary>'+esc(s.name)+' <span class="schoolHomeCount">'+teachers.length+' öğretmen · '+students.length+' öğrenci</span> '+stateTag(s.status)+'</summary><div class="schoolHomeMembers"><button class="secondary small" data-school-home="school" data-school-id="'+esc(s.id)+'">Okulu yönet</button><h3>Öğretmenler ('+teachers.length+')</h3>'+(teachers.length?'<ul>'+teachers.map(t=>'<li><button class="studentNameLink" data-school-home="teacher" data-id="'+esc(t.id)+'" data-school-id="'+esc(s.id)+'">'+esc(t.full_name||'Öğretmen')+'</button> '+stateTag(t.status)+'</li>').join('')+'</ul>':'<p class="schoolMuted">Henüz öğretmen eklenmedi.</p>')+'<h3>Öğrenciler ('+students.length+')</h3>'+(students.length?'<ul>'+students.map(st=>'<li><button class="studentNameLink" data-school-home="student" data-id="'+esc(st.id)+'" data-school-id="'+esc(s.id)+'">'+esc(st.full_name||'Öğrenci')+'</button><span>'+esc(st.grade||'')+'</span><span class="schoolMuted">'+esc(names.get(st.coach_id)||'Yönetici / Atanmamış')+'</span></li>').join('')+'</ul>':'<p class="schoolMuted">Henüz öğrenci eklenmedi.</p>')+'</div></details>';
+  }).join('')||( '<p class="schoolMuted">Henüz okul eklenmedi. Okullar bölümünden okul ekleyebilirsiniz.</p>');
+ }
+ async function refreshHome(){
+  if(!homeAllowed())return;if(homeFlight)return homeFlight;const revision=++homeRequest;
+  homeFlight=(async()=>{try{await refreshDirectory();if(revision===homeRequest&&homeAllowed()){renderHome();E('schoolHomeMessage').textContent='';}}catch(e){if(revision===homeRequest&&homeAllowed())E('schoolHomeMessage').textContent='Okullar alınamadı: '+e.message;}finally{if(revision===homeRequest)homeFlight=null;}})();return homeFlight;
+ }
+ home.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-school-home]');if(!b||!homeAllowed()||b.disabled)return;const action=b.getAttribute('data-school-home'),id=b.getAttribute('data-id'),school=b.getAttribute('data-school-id');b.disabled=true;
+  try{
+   if(action==='refresh')return await refreshHome();
+   if(action==='manage')return await openSchools();
+   if(action==='school'){await openSchools();return await showDetail(school);}
+   if(action==='teacher')return await openTeacherDetail(id);
+   if(action==='student'){window.ODEVSchoolContext=school;await loadCloudStudents();return await openStudentCenter(id);}
+  }catch(err){E('schoolHomeMessage').textContent=err.message||String(err);}finally{b.disabled=false;}
+ });
+ const homeOriginal=window.showAdminHome;window.showAdminHome=function(){
+  const reset=admin()&&(window.ODEVSchoolContext||window.adminTeacherPreviewId);
+  if(reset){window.ODEVSchoolContext=null;window.adminTeacherPreviewId=null;window.adminTeacherPreviewName='';document.body.classList.remove('teacherPreviewMode');applyRoleUI();}
+  const r=homeOriginal.apply(this,arguments);updateContext();if(reset)loadCloudStudents();else refreshHome();return r;
+ };
  function updateContext(){
   if(E('schoolNav'))E('schoolNav').style.display=admin()?'':'none';
+  home.hidden=!homeAllowed();individualHeading.hidden=!homeAllowed();
   banner.hidden=!admin()||!window.ODEVSchoolContext;
   if(!banner.hidden){banner.innerHTML='<b>'+esc(schoolName(window.ODEVSchoolContext))+'</b> — okul öğrencileri <button class="secondary small" id="schoolBackIndividual">Bireysel bölüme dön</button>';E('schoolBackIndividual').onclick=()=>individual();}
  }
- const apply=window.applyRoleUI;window.applyRoleUI=function(){const r=apply.apply(this,arguments);updateContext();return r};
- const load=window.loadCloudStudents;window.loadCloudStudents=async function(){const r=await load.apply(this,arguments);updateContext();return r};
+ const apply=window.applyRoleUI;window.applyRoleUI=function(){const r=apply.apply(this,arguments);updateContext();if(homeAllowed())refreshHome();return r};
+ const load=window.loadCloudStudents;window.loadCloudStudents=async function(){const r=await load.apply(this,arguments);updateContext();await refreshHome();return r};
  async function individual(){window.ODEVSchoolContext=null;window.adminTeacherPreviewId=null;window.adminTeacherPreviewName='';document.body.classList.remove('teacherPreviewMode');showAdminHome();await loadCloudStudents();}
  const showStudentsOriginal=window.showStudents;window.showStudents=async function(){if(admin()){await individual();return showStudentsOriginal.apply(this,arguments)}return showStudentsOriginal.apply(this,arguments)};
  window.showTeachers=async function(){if(admin())await individual();showAdminHome();E('approvedTeachersPanel')?.scrollIntoView({behavior:'smooth',block:'start'})};
@@ -3442,7 +3479,7 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
   try{const application=session.user?.user_metadata?.ode_school_application;if(application)await rpc('odev_submit_student_application',{p_school_id:application.school_id||null,p_coach_id:application.coach_id,p_application_data:application.application_data});const state=await rpc('odev_school_session',{});if(state?.allowed===false)throw new Error('Okulunuz pasif durumda. Yöneticiyle iletişime geçin.');return await route.apply(this,arguments)}
   catch(e){await sb.auth.signOut();E('authOverlay')?.classList.remove('hidden');if(E('authStatus'))E('authStatus').textContent=e.message;}
  };
- async function refreshDirectory(){const revision=epoch,result=await Promise.all([rpc('odev_schools',{p_action:'list'}),rpc('odev_schools',{p_action:'directory'})]);if(revision!==epoch||!admin())throw new Error('Oturum değişti.');[schools,directory]=result;}
+ async function refreshDirectory(){const revision=epoch,result=await Promise.all([rpc('odev_schools',{p_action:'list'}),rpc('odev_schools',{p_action:'directory'})]);if(revision!==epoch||!admin())throw new Error('Oturum değişti.');[schools,directory]=result;renderHome();}
  const stateTag=s=>'<span class="schoolState '+(s==='disabled'?'off':'')+'">'+(s==='disabled'?'Pasif':'Aktif')+'</span>';
  window.openSchools=async function(){if(!admin())return;selected=null;detail=null;modal.classList.add('show');E('schoolTitle').textContent='🏫 Okullar';E('schoolBody').textContent='Yükleniyor…';const revision=++ticket;
   try{await refreshDirectory();if(revision!==ticket||!admin())return;renderList()}catch(e){E('schoolBody').textContent='Okullar alınamadı: '+e.message}
@@ -3493,7 +3530,7 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
   }catch(err){E('schoolMessage').textContent=err.message||String(err)}finally{if(mutation){busy=false;b.disabled=false}}
  });
  const close=window.closeModal;window.closeModal=function(id){if(id==='schoolsModal')ticket++;if(id==='teacherDetailModal')teacherRequest++;return close.apply(this,arguments)};
- sb.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){epoch++;ticket++;teacherRequest++;selected=null;assignment=null;schools=[];directory={teachers:[],students:[]};window.ODEVSchoolContext=null;modal.classList.remove('show');assignModal.classList.remove('show');if(E('schoolNav'))E('schoolNav').style.display='none';banner.hidden=true;E('schoolBody').textContent='';E('schoolAssignBody').textContent='';}});
+ sb.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){epoch++;ticket++;teacherRequest++;homeRequest++;homeFlight=null;home.hidden=true;individualHeading.hidden=true;E('schoolHomeList').textContent='';E('schoolHomeMessage').textContent='';selected=null;assignment=null;schools=[];directory={teachers:[],students:[]};window.ODEVSchoolContext=null;modal.classList.remove('show');assignModal.classList.remove('show');if(E('schoolNav'))E('schoolNav').style.display='none';banner.hidden=true;E('schoolBody').textContent='';E('schoolAssignBody').textContent='';}});
  updateContext();
 })();
 
