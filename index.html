@@ -3699,3 +3699,14 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
 })();
 
 </script>
+
+<style id="compactClock20261017">
+/* Separate, compact live clock strips on all three panels. */
+#coach #adminCountdown,#student #studentLiveClockPanel{min-height:60px!important;padding:14px 22px!important;margin:14px 0 20px!important;border-radius:14px!important;background:linear-gradient(115deg,#102b46,#1769ce)!important;box-shadow:0 5px 14px -7px #174e8055!important}
+#coach #adminCountdown #adminLiveDateTime,#student #studentLiveClockPanel .liveClockInner{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:12px!important;flex-direction:row!important;text-align:left!important;padding:0!important;min-width:0;width:100%!important}
+#coach #adminCountdown #adminLiveDate,#student #studentLiveClockPanel #studentLiveDate{font-size:17px!important;line-height:1.45!important;font-weight:600!important;letter-spacing:0!important;min-width:0;text-align:left!important;overflow-wrap:anywhere}
+#coach #adminCountdown #adminLiveTime,#student #studentLiveClockPanel #studentLiveTime{font-size:24px!important;line-height:1.25!important;font-weight:750!important;letter-spacing:.3px!important;text-align:right!important;white-space:nowrap;margin:0!important;font-variant-numeric:tabular-nums}
+@media(max-width:650px){#coach>.top>.toolbar,#student>.studentHero>div:last-child{position:static!important;align-self:flex-end;max-width:100%;width:100%;margin-top:18px!important;justify-content:flex-end}#coach>.top,#student>.studentHero{padding:24px 18px!important;min-height:0!important}#coach>.top>div:first-child,#student>.studentHero>div:first-child{flex:0 1 auto!important}#coach #adminCountdown,#student #studentLiveClockPanel{min-height:56px!important;padding:12px 14px!important;border-radius:12px!important}#coach #adminCountdown #adminLiveDate,#student #studentLiveClockPanel #studentLiveDate{font-size:14px!important}#coach #adminCountdown #adminLiveTime,#student #studentLiveClockPanel #studentLiveTime{font-size:21px!important}#coach #adminCountdown #adminLiveDateTime,#student #studentLiveClockPanel .liveClockInner{gap:10px!important}}
+@media(max-width:340px){#coach #adminCountdown #adminLiveDate,#student #studentLiveClockPanel #studentLiveDate{font-size:13px!important}#coach #adminCountdown #adminLiveTime,#student #studentLiveClockPanel #studentLiveTime{font-size:19px!important}}
+
+</style>
