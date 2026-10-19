@@ -274,6 +274,9 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;background:#f4f7fb}html
 
 
 <!-- FINAL_SAFE_PUBLISHED_EDIT_AND_CONFLICT_GUARD_20260924 -->
+
+
+
 </body></html>`);w.document.close();w.print()}
 
 (function(){
@@ -3018,7 +3021,7 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
     const w=window.open('','_blank');if(!w)return alert('Yazdırma penceresi açılamadı. Tarayıcıda açılır pencerelere izin verip tekrar deneyin.');
     const s=catalogData?.student||{},heading=mode==='curriculum'?'Müfredat listesi ve haftalar':'Yayımlanan program kayıtları';
     const meta=[s.full_name,s.program_type==='ARA'?(s.grade?String(s.grade)+'. sınıf':'Ara sınıf'):s.program_type==='YKS'?['YKS',s.exam_stage,s.field].filter(Boolean).join(' • '):s.program_type].filter(Boolean).join(' • ');
-    w.document.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(heading)+'</title><style>body{font-family:Arial,sans-serif;color:#172b43;margin:28px;font-size:12px}h1{font-size:21px;margin:0 0 7px}h2{font-size:16px;margin:22px 0 8px;border-bottom:1px solid #d7e0ea;padding-bottom:5px}.meta{color:#56677a;margin:0 0 18px}.curriculumCalendarList{display:grid;gap:7px;margin:8px 0 16px}.curriculumCalendarRow{display:grid;grid-template-columns:minmax(170px,1fr) minmax(210px,1.2fr);gap:10px;padding:9px;border:1px solid #ccd7e3;border-radius:7px;break-inside:avoid}.curriculumCalendarRow.isDone{background:#e9f7ed!important;border-color:#9fd4af!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}.curriculumCalendarRow>div:first-child{display:grid;gap:4px}.curriculumCalendarState{font-size:11px;color:#4d5e70}.curriculumCalendarRow.isDone .curriculumCalendarState{color:#14753a;font-weight:700}.curriculumCalendarDates{display:flex;gap:6px;flex-wrap:wrap}.curriculumCalendarDate{padding:5px 7px;background:#eef5ff;border-radius:5px;print-color-adjust:exact;-webkit-print-color-adjust:exact}.curriculumCalendarDate small{color:#52627a}.curriculumSourceInfo{margin:0 0 16px;color:#43556a}.curriculumSourceInfo a{color:#175cb3}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #ccd7e3;padding:7px;text-align:left;vertical-align:top}th{background:#eef3f8;print-color-adjust:exact;-webkit-print-color-adjust:exact}small{color:#52627a}@page{size:A4;margin:14mm}@media(max-width:600px){body{margin:12px}.curriculumCalendarRow{grid-template-columns:1fr}}@media print{body{margin:0}a{color:inherit;text-decoration:none}}</style></head><body><h1>'+esc(heading)+'</h1><p class="meta">'+esc(meta)+' • Yazdırma tarihi: '+esc(new Date().toLocaleDateString('tr-TR'))+'</p>'+((mode==='curriculum'&&E('historySourceInfo').innerHTML)||'')+body+'</body></html>');
+    w.document.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(heading)+'</title><style>body{font-family:Arial,sans-serif;color:#172b43;margin:28px;font-size:12px}h1{font-size:21px;margin:0 0 7px}h2{font-size:16px;margin:22px 0 8px;border-bottom:1px solid #d7e0ea;padding-bottom:5px}.meta{color:#56677a;margin:0 0 18px}.curriculumCalendarList{display:grid;gap:7px;margin:8px 0 16px}.curriculumCalendarRow{display:grid;grid-template-columns:minmax(170px,1fr) minmax(210px,1.2fr);gap:10px;padding:9px;border:1px solid #ccd7e3;border-radius:7px;break-inside:avoid}.curriculumCalendarRow.isDone{background:#e9f7ed!important;border-color:#9fd4af!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}.curriculumCalendarRow>div:first-child{display:grid;gap:4px}.curriculumCalendarState{font-size:11px;color:#4d5e70}.curriculumCalendarRow.isDone .curriculumCalendarState{color:#14753a;font-weight:700}.curriculumCalendarDates{display:flex;gap:6px;flex-wrap:wrap}.curriculumCalendarDate{padding:5px 7px;background:#eef5ff;border-radius:5px;print-color-adjust:exact;-webkit-print-color-adjust:exact}.curriculumCalendarDate small{color:#52627a}.curriculumSourceInfo{margin:0 0 16px;color:#43556a}.curriculumSourceInfo a{color:#175cb3}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #ccd7e3;padding:7px;text-align:left;vertical-align:top}th{background:#eef3f8;print-color-adjust:exact;-webkit-print-color-adjust:exact}small{color:#52627a}@page{size:A4;margin:14mm}@media(max-width:600px){body{margin:12px}.curriculumCalendarRow{grid-template-columns:1fr}}@media print{body{margin:0}a{color:inherit;text-decoration:none}}</style></head><body><h1>'+esc(heading)+'</h1><p class="meta">'+esc(meta)+' • Yazdırma tarihi: '+esc(new Date().toLocaleDateString('tr-TR'))+'</p>'+((mode==='curriculum'&&E('historySourceInfo').innerHTML)||'')+body+'\n</body></html>');
     w.document.close();w.focus();setTimeout(()=>w.print(),250);
   }
   function pdfBlob(title,meta,blocks){
@@ -3860,3 +3863,39 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
 @media(max-width:540px){.learningPace .paceSummary{grid-template-columns:1fr;gap:10px}.learningPace .paceSummary>div{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.learningPace .paceSummary small{margin:0;flex:1}.learningPace .paceSummary strong{font-size:14px;text-align:right;flex:1}.learningPace .paceDetails summary{font-size:13px}}
 
 </style>
+
+<style id="adminOnlyApprovals20261019">
+/* Kullanıcı başvurularını yalnızca sistem yöneticisi yönetir. */
+body.coachRole button[onclick="openApplications()"],
+body.teacherPreviewMode button[onclick="openApplications()"]{display:none!important}
+</style>
+<script id="adminOnlyApprovalsGuard20261019">
+(function(){
+  const open=window.openApplications;
+  if(typeof open==='function')window.openApplications=async function(){
+    if(currentProfile?.role!=='admin')return;
+    return open.apply(this,arguments);
+  };
+  const approve=window.approveApplicationV177;
+  if(typeof approve==='function')window.approveApplicationV177=async function(){
+    if(currentProfile?.role!=='admin')return;
+    return approve.apply(this,arguments);
+  };
+  const reject=window.rejectApplicationV177;
+  if(typeof reject==='function')window.rejectApplicationV177=async function(){
+    if(currentProfile?.role!=='admin')return;
+    return reject.apply(this,arguments);
+  };
+  const refresh=window.refreshHomeApprovals;
+  if(typeof refresh==='function')window.refreshHomeApprovals=async function(){
+    if(currentProfile?.role!=='admin'){
+      const box=document.getElementById('homeApprovalsList');
+      if(box)box.replaceChildren();
+      return;
+    }
+    return refresh.apply(this,arguments);
+  };
+})();
+</script>
+
+<!-- Admin-only approvals update 2026-10-19 -->
