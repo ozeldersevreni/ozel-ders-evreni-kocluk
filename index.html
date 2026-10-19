@@ -803,7 +803,7 @@ window.generateAIPlan=async function(){
     data=await window.applyLearningPlan(st,data);
     st.__school_rules=await integrityGetRules(st);
     data.school_days=st.__school_rules?.school_days||[];
-    if(file && st.school_status!=='graduate' && !confirm('Yeni fotoğraf için kayıtlı okul çıkış saatleri güncel mi? Saatler değiştiyse İptal deyip Okul saatleri alanını güncelleyin.'))return;
+    // Elle okul çıkış saati onayı kaldırıldı; ders programı görseli kullanılmaya devam eder.
 
 
     const customInstruction=document.getElementById('aiInstruction')?.value.trim()||'';
@@ -3365,7 +3365,7 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
  window.prepareCompleteWeeklyAIProgram=async function(worker,token,payload,student,week,setStatus){
   if(!student.__learning_enabled)return previousComplete.apply(this,arguments);
   const topics=payload.student.allowed_topics||[];
-  const instruction='ZORUNLU: Yalnızca pazartesi-cuma günlerine çalışma koy; cumartesi ve pazar boş kalacak. Konuları yalnızca allowed_topics listesindeki ders-konu eşleşmeleriyle kullan. Tamamlanan konu verme ve listede olmayan konu uydurma. Hafta içi okul çıkışından sonra en az 90 dakika ara bırak; okul saatleriyle çakıştırma. Fotoğrafta okunamayan okul saatlerini varsayma. Günlük toplam çalışma öğrencinin daily_minutes değerini aşmasın. Konu bitirme durumunu günlük görev tamamlanmasından türetme.';
+  const instruction='ZORUNLU: Yalnızca pazartesi-cuma günlerine çalışma koy; cumartesi ve pazar boş kalacak. Konuları yalnızca allowed_topics listesindeki ders-konu eşleşmeleriyle kullan. Tamamlanan konu verme ve listede olmayan konu uydurma. Okul ders programı fotoğrafında görünen ders saatleriyle çakıştırma; fotoğrafta okunmayan saatleri varsayma. Günlük toplam çalışma öğrencinin daily_minutes değerini aşmasın. Konu bitirme durumunu günlük görev tamamlanmasından türetme.';
   return previousComplete(worker,token,{...payload,coach_instruction:[payload.coach_instruction,instruction].filter(Boolean).join('\n'),required_topics:topics},student,week,setStatus);
  };
  const previousTemplate=window.prepareWeeklyProgramFromPrevious;
@@ -3898,4 +3898,33 @@ body.teacherPreviewMode button[onclick="openApplications()"]{display:none!import
 })();
 </script>
 
-<!-- Admin-only approvals update 2026-10-19 -->
+
+<script id="removeManualSchoolHours20261019">
+(function(){
+  const weekday=d=>typeof ODEVLearningCore!=='undefined'&&ODEVLearningCore.isWeekday(d);
+  window.integrityGetRules=async function(student){if(student)student.__school_rules=null;return null;};
+  window.integrityValidateTasks=function(tasks,student,week){
+    if(!Array.isArray(tasks)||!tasks.length)throw new Error('Boş program kaydedilemez.');
+    const byDay=new Map(),endWeek=addDaysISO(week,4);
+    for(const t of tasks){
+      if(!weekday(t.task_date)||t.task_date<week||t.task_date>endWeek)throw new Error('Dersler yalnızca seçilen haftanın pazartesi-cuma günlerinde olabilir.');
+      const a=hmToMin(String(t.start_time||'').slice(0,5)),b=hmToMin(String(t.end_time||'').slice(0,5));
+      if(a==null||b==null||b<=a)throw new Error('Çalışma saatlerini kontrol edin.');
+      if(t.target_questions!=null&&(!Number.isInteger(Number(t.target_questions))||Number(t.target_questions)<0))throw new Error('Soru hedefi negatif olmayan tam sayı olmalı.');
+      if(!byDay.has(t.task_date))byDay.set(t.task_date,[]);byDay.get(t.task_date).push({a,b});
+    }
+    const limit=Number(student?.daily_minutes)>0?Number(student.daily_minutes):180;
+    for(const rows of byDay.values()){
+      rows.sort((x,y)=>x.a-y.a);
+      if(rows.reduce((n,x)=>n+x.b-x.a,0)>limit)throw new Error('Günlük çalışma süresi aşılıyor.');
+      if(rows.some((x,i)=>i&&x.a<rows[i-1].b))throw new Error('Ders saatleri çakışıyor.');
+    }
+    return true;
+  };
+  window.openSchoolRules=async function(){return;};
+  const removeButton=()=>document.getElementById('schoolRulesOpen')?.remove();
+  const oldLoad=window.loadScheduleForStudent;
+  if(typeof oldLoad==='function')window.loadScheduleForStudent=async function(){const r=await oldLoad.apply(this,arguments);removeButton();return r;};
+  removeButton();
+})();
+</script>
