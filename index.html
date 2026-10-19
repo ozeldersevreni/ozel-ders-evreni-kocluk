@@ -1269,10 +1269,18 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
     if(previewId) rows=rows.filter(x=>String(x.coach_id||'')===String(previewId));
     else if(currentProfile?.role==='coach') rows=rows.filter(x=>String(x.coach_id||'')===String(currentProfile.id));
 
-    const ids=rows.map(x=>x.student_user_id).filter(Boolean);
-    if(ids.length && (currentProfile?.role!=='admin'||previewId)){
-      const pr=await sb.from('profiles').select('id,status').in('id',ids);
-      if(!pr.error){const active=new Set((pr.data||[]).filter(p=>p.status==='active').map(p=>p.id));rows=rows.filter(x=>!x.student_user_id||active.has(x.student_user_id));}
+    // Öğretmen ekranında yalnız onaylanmış öğrenci hesapları görünür.
+    // Yönetici görünümü korunur; öğretmen kapsamını coach_id ve students RLS belirler.
+    if(previewId || currentProfile?.role==='coach'){
+      const linkedIds=[...new Set(rows.map(x=>x.student_user_id).filter(Boolean))];
+      let activeIds=new Set();
+      if(linkedIds.length){
+        const {data:profiles,error:profileError}=await sb.from('profiles')
+          .select('id,status,role').in('id',linkedIds).eq('role','student').eq('status','active');
+        if(profileError){renderStudents([]);syncState.textContent='⚠️ Öğrenci onayları alınamadı: '+profileError.message;return;}
+        activeIds=new Set((profiles||[]).map(x=>x.id));
+      }
+      rows=rows.filter(x=>x.student_user_id&&activeIds.has(x.student_user_id));
     }
     if(currentProfile?.role==='admin' && !previewId){
       const tr=await sb.from('profiles').select('id,full_name,status').eq('role','coach').in('status',['active','disabled']).order('full_name',{ascending:true});
@@ -2975,7 +2983,7 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
       const raw=String(s.exam_stage||'TYT').toLocaleUpperCase('tr-TR').replace('YKS - ','').replace('YKS ','').trim();
       const stage=(raw==='YDT'||String(s.field||'').toLocaleLowerCase('tr-TR').includes('dil'))?'YDT':(raw==='AYT'?'AYT':'TYT');
       title='YKS konu listesi • '+stage+(s.field?' • '+String(s.field):'');
-      source=a('https://www.osym.gov.tr/sinavlar/yks/yks-sinav-kilavuzu/','ÖSYM YKS kılavuzları');
+      source=a('https://ttkb.meb.gov.tr/www/osym-tarafindan-2026-yilinda-gerceklestirilecek-quotyuksekogretim-kurumlari-sinavi-yksquotna-esas-derslere-ait-konu-ve-kazanimlar/icerik/831/','MEB 2026 YKS konu ve kazanımları');
     }else if(s.program_type==='ARA'){
       title='Ara sınıf • '+(s.grade?String(s.grade)+'. sınıf':'sınıf düzeyi');
       source=a('https://mufredat.meb.gov.tr/Programlar.aspx','İlgili sınıfın MEB öğretim programını aç');
