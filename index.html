@@ -274,9 +274,6 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;background:#f4f7fb}html
 
 
 <!-- FINAL_SAFE_PUBLISHED_EDIT_AND_CONFLICT_GUARD_20260924 -->
-
-
-
 </body></html>`);w.document.close();w.print()}
 
 (function(){
@@ -407,8 +404,8 @@ function hmToMin(v){const m=/^(\d{1,2}):(\d{2})/.exec(v||'');return m?(+m[1]*60 
 function normalizeSubjectName(v){return String(v||'').toLocaleLowerCase('tr-TR').replace(/ı/g,'i').replace(/[^a-z0-9çğıöşü ]/g,'').trim()}
 function validateAITasks(raw,student,week,planId){
  const isEATYT=String(student.program_type||'').toUpperCase()==='YKS'&&String(student.exam_stage||'TYT').toUpperCase().includes('TYT')&&normalizeSubjectName(student.field).includes('esit agirlik');
- const forbidden=isEATYT?['fizik','kimya','biyoloji','fen']:[];const used={},seen=new Set(),out=[];
- for(let i=0;i<Math.min((raw||[]).length,40);i++){const t=raw[i]||{};let d=t.task_date;if(!d||d<week||d>addDaysISO(week,6))d=addDaysISO(week,Math.min(i,6));const subj=String(t.subject||'Çalışma').trim(),ns=normalizeSubjectName(subj);if(forbidden.some(x=>ns.includes(x)))continue;let st=String(t.start_time||'18:00').slice(0,5),en=String(t.end_time||'19:00').slice(0,5),a=hmToMin(st),b=hmToMin(en);if(a==null||b==null||b<=a){a=18*60;b=19*60;st='18:00';en='19:00'}let dur=b-a;const key=[d,ns,normalizeSubjectName(t.topic)].join('|');if(seen.has(key))continue;used[d]=used[d]||[];if(used[d].some(x=>a<x.b&&b>x.a))continue;seen.add(key);used[d].push({a,b});out.push({plan_id:planId,student_id:student.id,task_date:d,start_time:st,end_time:en,subject:subj,topic:String(t.topic||''),description:String(t.description||''),target_questions:Number.isFinite(+t.target_questions)?+t.target_questions:null,status:'pending'})}
+ const forbidden=isEATYT?['fizik','kimya','biyoloji','fen']:[];const maxDaily=Math.max(60,Number(student.daily_minutes)||180);const used={},seen=new Set(),out=[];
+ for(let i=0;i<Math.min((raw||[]).length,40);i++){const t=raw[i]||{};let d=t.task_date;if(!d||d<week||d>addDaysISO(week,6))d=addDaysISO(week,Math.min(i,6));const subj=String(t.subject||'Çalışma').trim(),ns=normalizeSubjectName(subj);if(forbidden.some(x=>ns.includes(x)))continue;let st=String(t.start_time||'18:00').slice(0,5),en=String(t.end_time||'19:00').slice(0,5),a=hmToMin(st),b=hmToMin(en);if(a==null||b==null||b<=a){a=18*60;b=19*60;st='18:00';en='19:00'}let dur=b-a;const key=[d,ns,normalizeSubjectName(t.topic)].join('|');if(seen.has(key))continue;used[d]=used[d]||[];if(used[d].some(x=>a<x.b&&b>x.a))continue;let total=used[d].reduce((z,x)=>z+(x.b-x.a),0);if(total+dur>maxDaily)continue;seen.add(key);used[d].push({a,b});out.push({plan_id:planId,student_id:student.id,task_date:d,start_time:st,end_time:en,subject:subj,topic:String(t.topic||''),description:String(t.description||''),target_questions:Number.isFinite(+t.target_questions)?+t.target_questions:null,status:'pending'})}
  return out;
 }
 async function publishSchedule(planId){if(!canManagePlans())return alert('Yalnızca yönetici veya koç yayınlayabilir.');if(!confirm('Kontrol ettiğiniz bu program öğrenciye yayınlansın mı?'))return;const {error}=await sb.rpc('odev_publish_week',{p_plan_id:planId});if(error)return alert('Program yayınlanamadı: '+error.message);await loadScheduleForStudent();alert('Program öğrenciye yayınlandı.')}
@@ -803,7 +800,7 @@ window.generateAIPlan=async function(){
     data=await window.applyLearningPlan(st,data);
     st.__school_rules=await integrityGetRules(st);
     data.school_days=st.__school_rules?.school_days||[];
-    // Elle okul çıkış saati onayı kaldırıldı; ders programı görseli kullanılmaya devam eder.
+    if(file && st.school_status!=='graduate' && !confirm('Yeni fotoğraf için kayıtlı okul çıkış saatleri güncel mi? Saatler değiştiyse İptal deyip Okul saatleri alanını güncelleyin.'))return;
 
 
     const customInstruction=document.getElementById('aiInstruction')?.value.trim()||'';
@@ -857,8 +854,8 @@ saveInfo=async function(){let hours=infoHours.value===''?null:Number(infoHours.v
 async function v185Written(selected=''){const {data:st}=await sb.from('students').select('program_type,exam_stage,grade').eq('id',activeStudentId).single(),a=await v185Subjects(st||{});writtenSubject.innerHTML=a.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');writtenSubject.value=selected||a[0]||''}openWrittenExamModal=async function(){editingWrittenId=null;writtenDate.value='';await v185Written();document.getElementById('writtenExamModal').classList.add('show')};editWrittenExam=async function(id,subject,date){editingWrittenId=id;writtenDate.value=date;await v185Written(subject);document.getElementById('writtenExamModal').classList.add('show')}
 editDraftTask=async function(id){if(!canManagePlans())return;const {data:t,error}=await sb.from('study_tasks').select('*').eq('id',id).single();if(error)return alert(error.message);v185TaskEditId=id;const {data:st}=await sb.from('students').select('program_type,exam_stage,grade').eq('id',t.student_id).single();let q=sb.from('subject_topics').select('subject,topic').eq('curriculum_active',true).eq('program_type',st.program_type);if(st.program_type==='YKS')q=q.eq('exam_stage',String(st.exam_stage||'TYT').toUpperCase().replace('YKS - ','').trim());else if(st.program_type==='LGS')q=q.eq('grade','8');else q=q.eq('grade',String(st.grade));const r=await q.order('subject').order('sort_order');if(r.error)return alert(r.error.message);v185TaskCatalog=r.data||[];const a=[...new Set(v185TaskCatalog.map(x=>x.subject))];teSubject.innerHTML=a.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');teSubject.value=t.subject||a[0]||'';v185LoadTaskTopics(t.topic);teStart.value=String(t.start_time||'18:00').slice(0,5);teEnd.value=String(t.end_time||'19:00').slice(0,5);teQuestions.value=t.target_questions??'';document.getElementById('taskEditV185Modal').classList.add('show')}
 function v185LoadTaskTopics(selected=''){const a=v185TaskCatalog.filter(x=>x.subject===teSubject.value);teTopic.innerHTML=a.map(x=>`<option value="${escapeHtml(x.topic)}">${escapeHtml(x.topic)}</option>`).join('');teTopic.value=selected||a[0]?.topic||''}async function v185SaveTaskEdit(){if(!v185TaskEditId)return;const {error}=await sb.from('study_tasks').update({subject:teSubject.value,topic:teTopic.value,start_time:teStart.value,end_time:teEnd.value,target_questions:teQuestions.value===''?null:Number(teQuestions.value)}).eq('id',v185TaskEditId);if(error)return alert(error.message);closeModal('taskEditV185Modal');await loadScheduleForStudent()}
-function validateAITasks(raw,student,week,planId){const forbidden=v185Arr(student.excluded_subjects).map(v185Norm),used={},seen=new Set(),out=[];for(let i=0;i<Math.min((raw||[]).length,40);i++){const t=raw[i]||{},subj=String(t.subject||'').trim(),ns=v185Norm(subj);if(!subj||forbidden.includes(ns))continue;let d=t.task_date;if(!d||d<week||d>addDaysISO(week,6))d=addDaysISO(week,Math.min(i,6));const st=String(t.start_time||'').slice(0,5),en=String(t.end_time||'').slice(0,5),a=hmToMin(st),b=hmToMin(en);if(a==null||b==null||b<=a)continue;used[d]=used[d]||[];if(used[d].some(x=>a<x.b&&b>x.a))continue;const key=[d,ns,v185Norm(t.topic)].join('|');if(seen.has(key))continue;seen.add(key);used[d].push({a,b});out.push({plan_id:planId,student_id:student.id,task_date:d,start_time:st,end_time:en,subject:subj,topic:String(t.topic||''),description:String(t.description||''),target_questions:Number.isFinite(+t.target_questions)?+t.target_questions:null,status:'pending'})}return out}
-function validatePlanRowsForPublish(tasks,student){const errs=[],byDay={},forbidden=v185Arr(student.excluded_subjects).map(v185Norm);for(const t of tasks||[]){const ns=v185Norm(t.subject),a=hmToMin(t.start_time),b=hmToMin(t.end_time);if(forbidden.includes(ns))errs.push('Programdan çıkarılan ders bulundu: '+t.subject);if(a==null||b==null||b<=a)errs.push('Geçersiz saat: '+t.subject);(byDay[t.task_date]??=[]).push({a,b})}for(const [d,a] of Object.entries(byDay)){a.sort((x,y)=>x.a-y.a);let total=0;for(let i=0;i<a.length;i++){total+=Math.max(0,a[i].b-a[i].a);if(i&&a[i].a<a[i-1].b)errs.push('Saat çakışması: '+d)}}return [...new Set(errs)]}
+function validateAITasks(raw,student,week,planId){const forbidden=v185Arr(student.excluded_subjects).map(v185Norm),maxDaily=Math.max(60,Number(student.daily_minutes)||180),used={},seen=new Set(),out=[];for(let i=0;i<Math.min((raw||[]).length,40);i++){const t=raw[i]||{},subj=String(t.subject||'').trim(),ns=v185Norm(subj);if(!subj||forbidden.includes(ns))continue;let d=t.task_date;if(!d||d<week||d>addDaysISO(week,6))d=addDaysISO(week,Math.min(i,6));const st=String(t.start_time||'').slice(0,5),en=String(t.end_time||'').slice(0,5),a=hmToMin(st),b=hmToMin(en);if(a==null||b==null||b<=a)continue;used[d]=used[d]||[];if(used[d].some(x=>a<x.b&&b>x.a))continue;if(used[d].reduce((z,x)=>z+x.b-x.a,0)+(b-a)>maxDaily)continue;const key=[d,ns,v185Norm(t.topic)].join('|');if(seen.has(key))continue;seen.add(key);used[d].push({a,b});out.push({plan_id:planId,student_id:student.id,task_date:d,start_time:st,end_time:en,subject:subj,topic:String(t.topic||''),description:String(t.description||''),target_questions:Number.isFinite(+t.target_questions)?+t.target_questions:null,status:'pending'})}return out}
+function validatePlanRowsForPublish(tasks,student){const errs=[],byDay={},maxDaily=Math.max(60,Number(student.daily_minutes)||180),forbidden=v185Arr(student.excluded_subjects).map(v185Norm);for(const t of tasks||[]){const ns=v185Norm(t.subject),a=hmToMin(t.start_time),b=hmToMin(t.end_time);if(forbidden.includes(ns))errs.push('Programdan çıkarılan ders bulundu: '+t.subject);if(a==null||b==null||b<=a)errs.push('Geçersiz saat: '+t.subject);(byDay[t.task_date]??=[]).push({a,b})}for(const [d,a] of Object.entries(byDay)){a.sort((x,y)=>x.a-y.a);let total=0;for(let i=0;i<a.length;i++){total+=Math.max(0,a[i].b-a[i].a);if(i&&a[i].a<a[i-1].b)errs.push('Saat çakışması: '+d)}}return [...new Set(errs)]}
 const v185OldAI=openAIPlanModal;openAIPlanModal=async function(){await v185OldAI.apply(this,arguments);try{const sid=aiStudent.value||scheduleStudent.value,{data}=await sb.from('students').select('excluded_subjects').eq('id',sid).single();let el=document.getElementById('v185ExcludedSummary');if(!el){el=document.createElement('div');el.id='v185ExcludedSummary';el.className='excludedSummary';aiStatus.parentElement.insertBefore(el,aiStatus)}const a=v185Arr(data?.excluded_subjects);el.innerHTML='<b>Programdan çıkarılacak dersler:</b> '+(a.length?a.map(escapeHtml).join(', '):'Yok')}catch(_){}}
 // V18.5.3 definitive Student Information flow: independent from table rows and legacy editInfo.
 openInfo=async function(id){
@@ -1986,7 +1983,7 @@ function inspectWeeklyAIProgram(raw,student,week,topics){
   canonical.push({...t,subject,task_date,start_time,end_time});
  }
  const tasks=validateAITasks(canonical,student,week,null);
- if(tasks.length<canonical.length)errors.push((canonical.length-tasks.length)+' görev saat çakışması veya tekrar kontrolünde elendi.');
+ if(tasks.length<canonical.length)errors.push((canonical.length-tasks.length)+' görev saat çakışması, günlük süre veya tekrar kontrolünde elendi.');
  const present=new Set(tasks.map(t=>weeklySubjectKey(t.subject)));
  const missing=rules.subjects.filter(s=>!present.has(weeklySubjectKey(s)));
  return {tasks,missing,errors};
@@ -2011,7 +2008,8 @@ async function requestWeeklyAIJob(workerBase,accessToken,payload,setStatus){
 }
 async function prepareCompleteWeeklyAIProgram(workerBase,accessToken,payload,student,week,setStatus){
  const rules=weeklySubjectRules(student,payload.student.allowed_topics);
- const instruction='HAFTALIK DERS KAPSAMI ZORUNLU: '+rules.subjects.join(', ')+'. Bu derslerin HER BİRİ için haftada en az bir görev oluştur; hiçbirini atlama. Ders adları konu kataloğuyla aynı olsun. Bütün görev tarihleri '+week+' ile '+addDaysISO(week,6)+' arasında olsun. Saatler aynı gün içinde çakışmasın.';
+ const limit=Number(student.daily_minutes)>0?'Günlük toplam süre en fazla '+Number(student.daily_minutes)+' dakika olsun.':'Günlük çalışma süresi için ek bir varsayılan sınır uygulama.';
+ const instruction='HAFTALIK DERS KAPSAMI ZORUNLU: '+rules.subjects.join(', ')+'. Bu derslerin HER BİRİ için haftada en az bir görev oluştur; hiçbirini atlama. Ders adları konu kataloğuyla aynı olsun. Bütün görev tarihleri '+week+' ile '+addDaysISO(week,6)+' arasında olsun. Saatler aynı gün içinde çakışmasın. '+limit;
  let diagnostics='',best=null;
  for(let attempt=0;attempt<2;attempt++){
   setStatus('<b>Durum:</b> '+(attempt?'Eksik/çakışan görevler yeniden hazırlanıyor…':'Program hazırlanıyor…'));
@@ -2043,6 +2041,8 @@ function completeMissingWeeklySubjects(validTasks,student,week,data){
   const days=[...new Set(rows.map(t=>t.task_date))].sort();
   for(const day of days){
    const daily=rows.filter(t=>t.task_date===day).sort((a,b)=>hmToMin(a.start_time)-hmToMin(b.start_time));
+   const total=daily.reduce((n,t)=>n+hmToMin(t.end_time)-hmToMin(t.start_time),0),limit=Number(student.daily_minutes)>0?Number(student.daily_minutes):Infinity;
+   if(total+20>limit)continue;
    for(let i=1;i<daily.length;i++){
     const a=hmToMin(daily[i-1].end_time),b=hmToMin(daily[i].start_time);
     // Leave a ten-minute break on both sides when filling a gap.
@@ -2059,7 +2059,7 @@ function completeMissingWeeklySubjects(validTasks,student,week,data){
   const longest=rows.map((t,i)=>({t,i,length:hmToMin(t.end_time)-hmToMin(t.start_time)})).filter(x=>x.length>=50).sort((a,b)=>b.length-a.length)[0];
   if(longest){const t=longest.t,b=hmToMin(t.end_time);t.end_time=hm(b-30);t.target_questions=null;rows.push(make(subject,t.task_date,b-20,b));continue;}
   const missing=rules.subjects.filter(s=>!rows.some(t=>key(t.subject)===key(s)));
-  throw new Error('Eksik dersler mevcut çalışma saatlerine sığmadı: '+missing.join(', ')+'. Yeni program kaydedilmedi; mevcut programınız varsa korundu. Elle Program Hazırla bölümünden uygun gün/saat seçerek devam edin.');
+  throw new Error('Eksik dersler mevcut çalışma saatlerine sığmadı: '+missing.join(', ')+'. Yeni program kaydedilmedi; mevcut programınız varsa korundu. Elle Program Hazırla bölümünden uygun gün/saat seçerek devam edin veya günlük çalışma süresini artırıp yeniden oluşturun.');
  }
  const checked=inspectWeeklyAIProgram(rows,student,week,topics);
  if(checked.missing.length||checked.errors.length||!checked.tasks.length)throw new Error('Program güvenli şekilde tamamlanamadı. Yeni program kaydedilmedi; mevcut programınız varsa korundu. Elle Program Hazırla bölümünden devam edin.');
@@ -2151,28 +2151,31 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
  const topics=data.allowed_topics||[],rules=weeklySubjectRules(student,topics),key=weeklySubjectKey;
  const source=(data.previous_week_tasks||[]).filter(t=>!isExtraTask(t)&&rules.aliases.has(key(t.subject))).sort((a,b)=>String(a.task_date).localeCompare(String(b.task_date))||String(a.start_time).localeCompare(String(b.start_time)));
  if(!source.length)return null;
- // Konu Listem'de açıkça bitirilen konular applyLearningPlan tarafından çıkarılır.
- // Günlük programdaki "Tamamladım" durumu konu bitişi sayılmaz; sıradaki konu,
- // yalnızca kalan aktif konu listesinden seçilir.
  const progress=new Map((data.topic_progress||[]).map(p=>[String(p.topic_id),p]));
  const selections=new Map();
  for(const subject of [...new Set(source.map(t=>rules.aliases.get(key(t.subject))))]){
-  const candidates=topics.filter(t=>key(t.subject)===key(subject));
-  const next=candidates.find(t=>{const p=progress.get(String(t.id));return p?.status!=='completed'&&Number(p?.progress_percent)<100;})||candidates[0];
-  if(!next)throw new Error(subject+' için bitmemiş sıradaki konu bulunamadı; mevcut program korundu.');
-  selections.set(key(subject),next.topic);
+  const catalog=topics.filter(t=>key(t.subject)===key(subject));
+  const sessions=source.filter(t=>key(rules.aliases.get(key(t.subject)))===key(subject));
+  const completed=t=>{const p=progress.get(String(t.id));if(p?.status==='completed'||Number(p?.progress_percent)>=100)return true;const matches=sessions.filter(s=>key(s.topic)===key(t.topic));return !p&&matches.length>0&&matches.every(s=>s.status==='completed');};
+  const studied=sessions.map(s=>catalog.findIndex(t=>key(t.topic)===key(s.topic))).filter(i=>i>=0);
+  const unfinished=studied.filter(i=>!completed(catalog[i]));
+  let index=unfinished.length?Math.min(...unfinished):studied.length?Math.max(...studied)+1:0;
+  while(index<catalog.length&&completed(catalog[index]))index++;
+  const review=index>=catalog.length;
+  selections.set(key(subject),{topic:catalog[review?catalog.length-1:index]?.topic||'',review});
  }
  const previousWeek=addDaysISO(week,-7),end=addDaysISO(week,-1);
  const rows=source.map(t=>{
-  const subject=rules.aliases.get(key(t.subject)),topic=selections.get(key(subject));
+  const subject=rules.aliases.get(key(t.subject)),selection=selections.get(key(subject));
   const old=String(t.task_date||''),parsed=new Date(old+'T12:00:00Z');
   if(old<previousWeek||old>end||!/^\d{4}-\d{2}-\d{2}$/.test(old)||!Number.isFinite(parsed.getTime())||parsed.toISOString().slice(0,10)!==old)throw new Error('Önceki haftadaki ders tarihi geçersiz; yeni program kaydedilmedi.');
-  return {student_id:student.id,plan_id:null,task_date:addDaysISO(old,7),start_time:String(t.start_time||'').slice(0,5),end_time:String(t.end_time||'').slice(0,5),subject,topic:String(topic),description:'Müfredat sırasına göre çalışma',target_questions:t.target_questions??null,status:'pending'};
+  return {student_id:student.id,plan_id:null,task_date:addDaysISO(old,7),start_time:String(t.start_time||'').slice(0,5),end_time:String(t.end_time||'').slice(0,5),subject,topic:String(selection.topic),description:selection.review?'Müfredat tamamlandı: konu tekrarı':'Müfredat sırasına göre çalışma',target_questions:t.target_questions??null,status:'pending'};
  });
  const templateSubjects=[...new Set(rows.map(t=>t.subject))];
  const templateTopics=topics.filter(t=>templateSubjects.includes(t.subject));
+ // A template intentionally retains the previous week's subjects, rather than adding new courses.
  const checked=inspectWeeklyAIProgram(rows,{...student,program_type:student.program_type==='LGS'?'TEMPLATE':student.program_type},week,templateTopics);
- if(checked.errors.length||checked.missing.length||checked.tasks.length!==rows.length)throw new Error('Önceki haftanın gün/saat düzeninde geçersiz veya çakışan ders var. Yeni program kaydedilmedi; mevcut programınız varsa korundu.');
+ if(checked.errors.length||checked.missing.length||checked.tasks.length!==rows.length)throw new Error('Önceki haftanın gün/saat düzeni mevcut günlük süre ayarına uymuyor veya çakışma var. Yeni program kaydedilmedi; mevcut programınız varsa korundu. Elle Program Hazırla bölümünden saatleri düzenleyin.');
  return checked.tasks;
 }
 
@@ -2428,12 +2431,12 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
     const stage=String(student?.exam_stage||'TYT').toUpperCase().replace('YKS - ','').replace('YKS ','').trim();
     const forbidden=(student?.program_type==='YKS'&&stage==='TYT')?arr(student.__effective_excluded_subjects||student.excluded_subjects).map(norm):[];
     const allowed=(student?.program_type==='YKS'&&stage!=='TYT'&&Array.isArray(student.__allowed_subjects))?new Set(student.__allowed_subjects.map(norm)):null;
-    const used={},seen=new Set(),out=[];
+    const maxDaily=(Number(student.daily_minutes)>0?Number(student.daily_minutes):Infinity),used={},seen=new Set(),out=[];
     for(let i=0;i<(raw||[]).length;i++){
       const t=raw[i]||{},subj=String(t.subject||'').trim(),ns=norm(subj);if(!subj||forbidden.includes(ns)||(allowed&&!allowed.has(ns)))continue;
       let d=t.task_date;if(!d||d<week||d>addDaysISO(week,6))d=addDaysISO(week,Math.min(i,6));
       const st=String(t.start_time||'').slice(0,5),en=String(t.end_time||'').slice(0,5),a=hmToMin(st),b=hmToMin(en);if(a==null||b==null||b<=a)continue;
-      used[d]=used[d]||[];if(used[d].some(x=>a<x.b&&b>x.a))continue;
+      used[d]=used[d]||[];if(used[d].some(x=>a<x.b&&b>x.a))continue;if(used[d].reduce((z,x)=>z+x.b-x.a,0)+(b-a)>maxDaily)continue;
       const key=[d,ns,norm(t.topic),st,en].join('|');if(seen.has(key))continue;seen.add(key);used[d].push({a,b});out.push({plan_id:planId,student_id:student.id,task_date:d,start_time:st,end_time:en,subject:subj,topic:String(t.topic||''),description:String(t.description||''),target_questions:Number.isFinite(+t.target_questions)?+t.target_questions:null,status:'pending'});
     }return out;
   };
@@ -3015,7 +3018,7 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
     const w=window.open('','_blank');if(!w)return alert('Yazdırma penceresi açılamadı. Tarayıcıda açılır pencerelere izin verip tekrar deneyin.');
     const s=catalogData?.student||{},heading=mode==='curriculum'?'Müfredat listesi ve haftalar':'Yayımlanan program kayıtları';
     const meta=[s.full_name,s.program_type==='ARA'?(s.grade?String(s.grade)+'. sınıf':'Ara sınıf'):s.program_type==='YKS'?['YKS',s.exam_stage,s.field].filter(Boolean).join(' • '):s.program_type].filter(Boolean).join(' • ');
-    w.document.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(heading)+'</title><style>body{font-family:Arial,sans-serif;color:#172b43;margin:28px;font-size:12px}h1{font-size:21px;margin:0 0 7px}h2{font-size:16px;margin:22px 0 8px;border-bottom:1px solid #d7e0ea;padding-bottom:5px}.meta{color:#56677a;margin:0 0 18px}.curriculumCalendarList{display:grid;gap:7px;margin:8px 0 16px}.curriculumCalendarRow{display:grid;grid-template-columns:minmax(170px,1fr) minmax(210px,1.2fr);gap:10px;padding:9px;border:1px solid #ccd7e3;border-radius:7px;break-inside:avoid}.curriculumCalendarRow.isDone{background:#e9f7ed!important;border-color:#9fd4af!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}.curriculumCalendarRow>div:first-child{display:grid;gap:4px}.curriculumCalendarState{font-size:11px;color:#4d5e70}.curriculumCalendarRow.isDone .curriculumCalendarState{color:#14753a;font-weight:700}.curriculumCalendarDates{display:flex;gap:6px;flex-wrap:wrap}.curriculumCalendarDate{padding:5px 7px;background:#eef5ff;border-radius:5px;print-color-adjust:exact;-webkit-print-color-adjust:exact}.curriculumCalendarDate small{color:#52627a}.curriculumSourceInfo{margin:0 0 16px;color:#43556a}.curriculumSourceInfo a{color:#175cb3}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #ccd7e3;padding:7px;text-align:left;vertical-align:top}th{background:#eef3f8;print-color-adjust:exact;-webkit-print-color-adjust:exact}small{color:#52627a}@page{size:A4;margin:14mm}@media(max-width:600px){body{margin:12px}.curriculumCalendarRow{grid-template-columns:1fr}}@media print{body{margin:0}a{color:inherit;text-decoration:none}}</style></head><body><h1>'+esc(heading)+'</h1><p class="meta">'+esc(meta)+' • Yazdırma tarihi: '+esc(new Date().toLocaleDateString('tr-TR'))+'</p>'+((mode==='curriculum'&&E('historySourceInfo').innerHTML)||'')+body+'\n</body></html>');
+    w.document.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(heading)+'</title><style>body{font-family:Arial,sans-serif;color:#172b43;margin:28px;font-size:12px}h1{font-size:21px;margin:0 0 7px}h2{font-size:16px;margin:22px 0 8px;border-bottom:1px solid #d7e0ea;padding-bottom:5px}.meta{color:#56677a;margin:0 0 18px}.curriculumCalendarList{display:grid;gap:7px;margin:8px 0 16px}.curriculumCalendarRow{display:grid;grid-template-columns:minmax(170px,1fr) minmax(210px,1.2fr);gap:10px;padding:9px;border:1px solid #ccd7e3;border-radius:7px;break-inside:avoid}.curriculumCalendarRow.isDone{background:#e9f7ed!important;border-color:#9fd4af!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}.curriculumCalendarRow>div:first-child{display:grid;gap:4px}.curriculumCalendarState{font-size:11px;color:#4d5e70}.curriculumCalendarRow.isDone .curriculumCalendarState{color:#14753a;font-weight:700}.curriculumCalendarDates{display:flex;gap:6px;flex-wrap:wrap}.curriculumCalendarDate{padding:5px 7px;background:#eef5ff;border-radius:5px;print-color-adjust:exact;-webkit-print-color-adjust:exact}.curriculumCalendarDate small{color:#52627a}.curriculumSourceInfo{margin:0 0 16px;color:#43556a}.curriculumSourceInfo a{color:#175cb3}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #ccd7e3;padding:7px;text-align:left;vertical-align:top}th{background:#eef3f8;print-color-adjust:exact;-webkit-print-color-adjust:exact}small{color:#52627a}@page{size:A4;margin:14mm}@media(max-width:600px){body{margin:12px}.curriculumCalendarRow{grid-template-columns:1fr}}@media print{body{margin:0}a{color:inherit;text-decoration:none}}</style></head><body><h1>'+esc(heading)+'</h1><p class="meta">'+esc(meta)+' • Yazdırma tarihi: '+esc(new Date().toLocaleDateString('tr-TR'))+'</p>'+((mode==='curriculum'&&E('historySourceInfo').innerHTML)||'')+body+'</body></html>');
     w.document.close();w.focus();setTimeout(()=>w.print(),250);
   }
   function pdfBlob(title,meta,blocks){
@@ -3359,7 +3362,7 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
  window.prepareCompleteWeeklyAIProgram=async function(worker,token,payload,student,week,setStatus){
   if(!student.__learning_enabled)return previousComplete.apply(this,arguments);
   const topics=payload.student.allowed_topics||[];
-  const instruction='ZORUNLU: Yalnızca pazartesi-cuma günlerine çalışma koy; cumartesi ve pazar boş kalacak. Konuları yalnızca allowed_topics listesindeki ders-konu eşleşmeleriyle kullan. Tamamlanan konu verme ve listede olmayan konu uydurma. Okul ders programı fotoğrafında görünen ders saatleriyle çakıştırma; fotoğrafta okunmayan saatleri varsayma. Konu bitirme durumunu günlük görev tamamlanmasından türetme.';
+  const instruction='ZORUNLU: Yalnızca pazartesi-cuma günlerine çalışma koy; cumartesi ve pazar boş kalacak. Konuları yalnızca allowed_topics listesindeki ders-konu eşleşmeleriyle kullan. Tamamlanan konu verme ve listede olmayan konu uydurma. Hafta içi okul çıkışından sonra en az 90 dakika ara bırak; okul saatleriyle çakıştırma. Fotoğrafta okunamayan okul saatlerini varsayma. Günlük toplam çalışma öğrencinin daily_minutes değerini aşmasın. Konu bitirme durumunu günlük görev tamamlanmasından türetme.';
   return previousComplete(worker,token,{...payload,coach_instruction:[payload.coach_instruction,instruction].filter(Boolean).join('\n'),required_topics:topics},student,week,setStatus);
  };
  const previousTemplate=window.prepareWeeklyProgramFromPrevious;
@@ -3374,13 +3377,16 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
  const previousSave=window.saveCheckedWeeklyAITasks;
  window.saveCheckedWeeklyAITasks=async function(student,week,tasks){
   const fresh=await fetchLearningData(student.id),expected=pairs(C.next(fresh)),planned=pairs(student.__learning_next||[]),errors=[];
+  const totals=new Map();
   for(const t of tasks||[]){
    const next=expected.get(C.course(t.subject));
    if(!next||C.norm(next.topic)!==C.norm(t.topic)||(planned.has(C.course(t.subject))&&planned.get(C.course(t.subject)).id!==next.id))errors.push('Konu sırası değişti veya konu bitti: '+t.subject+' / '+t.topic);
    if(!C.isWeekday(t.task_date)||t.task_date<week||t.task_date>addDaysISO(week,4))errors.push('Çalışma pazartesi-cuma aralığında olmalı.');
    const a=hmToMin(String(t.start_time).slice(0,5)),b=hmToMin(String(t.end_time).slice(0,5));
    if(a==null||b==null||b<=a)errors.push('Geçersiz çalışma saati.');
+   totals.set(t.task_date,(totals.get(t.task_date)||0)+Math.max(0,b-a));
   }
+  if(Number(fresh.student.daily_minutes)>0&&[...totals.values()].some(n=>n>Number(fresh.student.daily_minutes)))errors.push('Günlük çalışma süresi aşılıyor.');
   if(!tasks?.length)errors.push('Programda geçerli çalışma yok.');
   if(errors.length)throw new Error([...new Set(errors)].join(' ')+' Mevcut program değiştirilmedi; listeyi yenileyip tekrar oluşturun.');
   return previousSave.apply(this,arguments);
@@ -3426,6 +3432,7 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
    if(t.target_questions!=null&&(!Number.isInteger(Number(t.target_questions))||Number(t.target_questions)<0))throw new Error('Soru hedefi negatif olmayan tam sayı olmalı.');
    if(!days.has(t.task_date))days.set(t.task_date,[]);days.get(t.task_date).push({a,b});
   }
+  const limit=Number(student.daily_minutes)>0?Number(student.daily_minutes):180;
   for(const rows of days.values()){rows.sort((a,b)=>a.a-b.a);if(rows.reduce((n,t)=>n+t.b-t.a,0)>limit)throw new Error('Günlük çalışma süresi aşılıyor.');if(rows.some((t,i)=>i&&t.a<rows[i-1].b))throw new Error('Ders saatleri çakışıyor.');}
   return true;
  };
@@ -3853,64 +3860,3 @@ function prepareWeeklyProgramFromPrevious(student,week,data){
 @media(max-width:540px){.learningPace .paceSummary{grid-template-columns:1fr;gap:10px}.learningPace .paceSummary>div{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.learningPace .paceSummary small{margin:0;flex:1}.learningPace .paceSummary strong{font-size:14px;text-align:right;flex:1}.learningPace .paceDetails summary{font-size:13px}}
 
 </style>
-
-<style id="adminOnlyApprovals20261019">
-/* Kullanıcı başvurularını yalnızca sistem yöneticisi yönetir. */
-body.coachRole button[onclick="openApplications()"],
-body.teacherPreviewMode button[onclick="openApplications()"]{display:none!important}
-</style>
-<script id="adminOnlyApprovalsGuard20261019">
-(function(){
-  const open=window.openApplications;
-  if(typeof open==='function')window.openApplications=async function(){
-    if(currentProfile?.role!=='admin')return;
-    return open.apply(this,arguments);
-  };
-  const approve=window.approveApplicationV177;
-  if(typeof approve==='function')window.approveApplicationV177=async function(){
-    if(currentProfile?.role!=='admin')return;
-    return approve.apply(this,arguments);
-  };
-  const reject=window.rejectApplicationV177;
-  if(typeof reject==='function')window.rejectApplicationV177=async function(){
-    if(currentProfile?.role!=='admin')return;
-    return reject.apply(this,arguments);
-  };
-  const refresh=window.refreshHomeApprovals;
-  if(typeof refresh==='function')window.refreshHomeApprovals=async function(){
-    if(currentProfile?.role!=='admin'){
-      const box=document.getElementById('homeApprovalsList');
-      if(box)box.replaceChildren();
-      return;
-    }
-    return refresh.apply(this,arguments);
-  };
-})();
-</script>
-
-
-<script id="removeManualSchoolHours20261019">
-(function(){
-  const weekday=d=>typeof ODEVLearningCore!=='undefined'&&ODEVLearningCore.isWeekday(d);
-  // Okul saati kayıtları artık program oluşturmada okunmaz veya uygulanmaz.
-  window.integrityGetRules=async function(student){if(student)student.__school_rules=null;return null;};
-  window.integrityValidateTasks=function(tasks,student,week,rules){
-    if(!Array.isArray(tasks)||!tasks.length)throw new Error('Boş program kaydedilemez.');
-    const byDay=new Map(),endWeek=addDaysISO(week,4),minute=v=>{const m=/^([01]\d|2[0-3]):([0-5]\d)(?::00)?$/.exec(String(v));return m?Number(m[1])*60+Number(m[2]):null;};
-    for(const t of tasks){
-      if(!weekday(t.task_date)||t.task_date<week||t.task_date>endWeek)throw new Error('Dersler yalnızca seçilen haftanın pazartesi-cuma günlerinde olabilir.');
-      const a=minute(String(t.start_time||'').slice(0,5)),b=minute(String(t.end_time||'').slice(0,5));
-      if(a==null||b==null||b<=a)throw new Error('Çalışma saatlerini kontrol edin.');
-      if(t.target_questions!=null&&(!Number.isInteger(Number(t.target_questions))||Number(t.target_questions)<0))throw new Error('Soru hedefi negatif olmayan tam sayı olmalı.');
-      if(!byDay.has(t.task_date))byDay.set(t.task_date,[]);byDay.get(t.task_date).push({a,b});
-    }
-    for(const rows of byDay.values()){rows.sort((x,y)=>x.a-y.a);if(rows.some((x,i)=>i&&x.a<rows[i-1].b))throw new Error('Ders saatleri çakışıyor.');}
-    return true;
-  };
-  window.openSchoolRules=async function(){return;};
-  const removeButton=()=>document.getElementById('schoolRulesOpen')?.remove();
-  const oldLoad=window.loadScheduleForStudent;
-  if(typeof oldLoad==='function')window.loadScheduleForStudent=async function(){const r=await oldLoad.apply(this,arguments);removeButton();return r;};
-  removeButton();
-})();
-</script>
