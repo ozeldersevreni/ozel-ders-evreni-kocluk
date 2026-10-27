@@ -1772,7 +1772,7 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 
 <style id="v190ManualPlanStyles">
 .manualPlanChoice{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0;padding:12px;background:#f6f8fc;border-radius:12px}
-.manualPlanGrid{display:grid;grid-template-columns:1fr 1.2fr;gap:14px}.manualHistory{max-height:430px;overflow:auto;border:1px solid #e4e9f2;border-radius:12px;padding:10px;background:#fafcff}.manualHistoryItem{padding:9px 10px;border-bottom:1px solid #edf1f6;font-size:13px}.manualHistoryItem:last-child{border-bottom:0}.manualHistoryItem b{display:block;margin-bottom:3px}.manualMeta{color:#5d6b82;font-size:12px}.manualProgress{font-weight:800}.manualForm{display:grid;grid-template-columns:1fr 1fr;gap:10px}.manualForm .full{grid-column:1/-1}.manualNotice{padding:10px 12px;background:#eef7ff;border:1px solid #cfe5ff;border-radius:10px;font-size:13px;margin-bottom:10px}@media(max-width:800px){.manualPlanGrid{grid-template-columns:1fr}.manualForm{grid-template-columns:1fr}.manualForm .full{grid-column:auto}}
+.manualPlanGrid{display:grid;grid-template-columns:minmax(230px,.8fr) minmax(0,1.5fr);gap:14px;align-items:start}.manualHistory{max-height:430px;overflow:auto;border:1px solid #e4e9f2;border-radius:12px;padding:10px;background:#fafcff}.manualHistoryItem{padding:9px 10px;border-bottom:1px solid #edf1f6;font-size:13px}.manualHistoryItem:last-child{border-bottom:0}.manualHistoryItem b{display:block;margin-bottom:3px}.manualMeta{color:#5d6b82;font-size:12px}.manualProgress{font-weight:800}.manualForm{display:grid;grid-template-columns:1fr 1fr;gap:10px}.manualForm .full{grid-column:1/-1}.manualNotice{padding:10px 12px;background:#eef7ff;border:1px solid #cfe5ff;border-radius:10px;font-size:13px;margin-bottom:10px}.manualWeekBoard{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.manualDayCard{min-width:0;border:1px solid #dbe4ef;background:#f9fbfe;border-radius:13px;overflow:hidden}.manualDayCard.chosen{border-color:#3984dc;box-shadow:0 0 0 2px #e2efff}.manualDayHead{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 11px;background:#edf4ff;color:#183a61;font-weight:800}.manualDayTasks{padding:8px 10px}.manualDayTask{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;padding:7px 2px;border-bottom:1px solid #e9eef5;font-size:12px}.manualDayTask:last-child{border-bottom:0}.manualDayTask time{font-weight:800;color:#1769e0;white-space:nowrap}.manualDayEmpty{padding:8px 2px;color:#738198;font-size:12px}.manualDayAdd{margin:0 10px 10px;width:calc(100% - 20px)}.manualFormPortal{margin:0 10px 10px;padding:12px;border:1px solid #b9d5f5;background:#fff;border-radius:11px}.manualFormPortal[hidden]{display:none}.manualFormTitle{font-weight:800;color:#174b82;margin:0 0 10px}.manualLocked{font-size:12px;color:#7a5b18;padding:8px 10px}.manualTopicHint{font-size:12px;color:#55677e;margin:0 0 10px}@media(max-width:800px){.manualPlanGrid{grid-template-columns:1fr}.manualForm{grid-template-columns:1fr}.manualForm .full{grid-column:auto}.manualWeekBoard{grid-template-columns:1fr}}
 </style>
 <div class="modal" id="manualPlanModal" style="z-index:2147483200">
  <div class="modalbox" style="width:min(1050px,96vw);max-height:92vh;overflow:auto">
@@ -1785,19 +1785,25 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
     <div id="manualHistory" class="manualHistory">Yükleniyor…</div>
    </div>
    <div>
-    <h3 style="margin-top:0">➕ Programa Ders Ekle</h3>
-    <div class="manualForm">
-     <div class="field"><label>Gün</label><select id="manualDay"></select></div>
-     <div class="field"><label>Ders</label><select id="manualSubject" onchange="manualLoadTopics()"></select></div>
-     <div class="field full"><label>Konu</label><select id="manualTopic" onchange="manualTopicChanged()"></select></div>
-     <div class="field"><label>Başlangıç</label><input id="manualStart" type="time" value="18:00"></div>
-     <div class="field"><label>Bitiş</label><input id="manualEnd" type="time" value="19:00"></div>
-     <div class="field"><label>Soru hedefi</label><input id="manualQuestions" type="number" min="0" placeholder="Örn. 40"></div>
-     <div class="field"><label>İlerleme</label><input id="manualProgressPreview" readonly value="İlerleme: %0"></div>
-     <div class="field full"><label>Açıklama (isteğe bağlı)</label><input id="manualDescription" placeholder="Örn. Konu tekrarı + soru çözümü"></div>
+    <h3 style="margin-top:0">🗓️ Haftanın Programı</h3>
+    <p class="manualTopicHint">Günün içindeki <b>+ Ders Ekle</b> düğmesine bas. Bitmemiş konuların tamamı seçilebilir; otomatik program sırası değişmez.</p>
+    <div id="manualWeekBoard" class="manualWeekBoard"></div>
+    <div id="manualFormHome"></div>
+    <div id="manualFormPortal" class="manualFormPortal" hidden>
+     <div class="manualFormTitle" id="manualFormTitle"></div>
+     <input id="manualDay" type="hidden"/>
+     <div class="manualForm">
+      <div class="field"><label>Ders</label><select id="manualSubject" onchange="manualLoadTopics()"></select></div>
+      <div class="field"><label>Konu (bitmemiş konular)</label><select id="manualTopic" onchange="manualTopicChanged()"></select></div>
+      <div class="field"><label>Başlangıç</label><input id="manualStart" type="time" value="18:00"></div>
+      <div class="field"><label>Bitiş</label><input id="manualEnd" type="time" value="19:00"></div>
+      <div class="field"><label>Soru hedefi</label><input id="manualQuestions" type="number" min="0" placeholder="Örn. 40"></div>
+      <div class="field"><label>İlerleme</label><input id="manualProgressPreview" readonly value="İlerleme: %0"></div>
+      <div class="field full"><label>Açıklama (isteğe bağlı)</label><input id="manualDescription" placeholder="Örn. Konu tekrarı + soru çözümü"></div>
+     </div>
+     <div class="modalactions" style="padding-bottom:0"><button class="green" id="manualAddBtn" onclick="saveManualPlanTask()">➕ Bu Güne Ekle</button></div>
+     <div id="manualAddedInfo" class="info" style="margin-top:10px"></div>
     </div>
-    <div class="modalactions" style="padding-bottom:0"><button class="green" id="manualAddBtn" onclick="saveManualPlanTask()">➕ Programa Ekle</button></div>
-    <div id="manualAddedInfo" class="info" style="margin-top:10px"></div>
    </div>
   </div>
   <div class="modalactions"><button class="secondary" onclick="closeModal('manualPlanModal')">Kapat</button><button class="primary" onclick="finishManualPlan()">✓ Programı Gör</button></div>
@@ -1805,16 +1811,20 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
 </div>
 <script id="v190ManualPlanSystem">
 (function(){
+ const E=id=>document.getElementById(id);
  const norm=s=>String(s||'').trim().toLocaleLowerCase('tr-TR');
  const esc=s=>typeof escapeHtml==='function'?escapeHtml(String(s??'')):String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
  const EA_BLOCK=['fizik','kimya','biyoloji','fen'];
+ const manualPortal=E('manualFormPortal');
  let ctx=null;
  const isEA=st=>{const f=norm(st?.field);return st?.program_type==='YKS'&&(f.includes('eşit')||f==='ea')};
  const allowedSubject=(st,s)=>!isEA(st)||!EA_BLOCK.some(x=>norm(s).includes(x));
  async function catalogFor(st){
    let rows=[];
    if(typeof getCatalogForStudent==='function'){
-     rows=ODEVLearningCore.next(await fetchLearningData(st.id));
+     // Elle hazırlamada sadece sıradaki tek konuyu değil, öğrencinin aktif aşamasındaki
+     // bütün bitmemiş konuları göster. Otomatik üretimin sıralama mantığı değişmez.
+     rows=await getCatalogForStudent(st);
      return rows.filter(x=>allowedSubject(st,x.subject));
    }
    if(!rows.length){
@@ -1834,40 +1844,61 @@ body.teacherPreviewMode #teacherPreviewBanner{display:flex;justify-content:space
    try{
      const sr=await sb.from('students').select('*').eq('id',sid).single();if(sr.error)throw sr.error;const st=sr.data;
      const cat=await catalogFor(st);
-     const [pr,hr]=await Promise.all([
+     const [pr,hr,planResult]=await Promise.all([
        window.getLearningProgressRows(sid),
-       sb.from('study_tasks').select('subject,topic,task_date,status').eq('student_id',sid).order('task_date',{ascending:false})
+       sb.from('study_tasks').select('id,subject,topic,task_date,start_time,end_time,target_questions,status').eq('student_id',sid).order('task_date',{ascending:false}),
+       sb.from('study_plans').select('id,status').eq('student_id',sid).eq('week_start',typeof scheduleTargetWeek==='function'?scheduleTargetWeek():mondayISO()).maybeSingle()
      ]);if(pr.error)throw pr.error;if(hr.error)throw hr.error;
      const pmap=new Map((pr.data||[]).map(x=>[String(x.topic_id),x])),hmap=new Map();
      for(const x of (hr.data||[])){const k=norm(x.subject)+'|'+norm(x.topic);if(!hmap.has(k))hmap.set(k,x)}
      const week=typeof scheduleTargetWeek==='function'?scheduleTargetWeek():(typeof mondayISO==='function'?mondayISO():new Date().toISOString().slice(0,10));
-     ctx={student:st,catalog:cat,progress:pmap,history:hmap,week};
+     if(planResult.error)throw planResult.error;
+     const end=typeof addDaysISO==='function'?addDaysISO(week,4):week;
+     ctx={student:st,catalog:cat,progress:pmap,history:hmap,week,locked:planResult.data?.status==='published',tasks:(hr.data||[]).filter(x=>x.task_date>=week&&x.task_date<=end)};
      document.getElementById('manualPlanStudentInfo').innerHTML='<b>'+esc(st.full_name)+'</b> • '+esc(st.program_type||'')+' '+esc(st.exam_stage||'')+' • '+esc(st.field||'')+'<br>AI çalışmasa bile bu ekran aynı konu geçmişi ve ilerleme kayıtlarıyla devam eder.';
      const subjects=[...new Set(cat.map(x=>x.subject).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
      document.getElementById('manualSubject').innerHTML=subjects.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
      document.getElementById('manualHistorySubject').innerHTML='<option value="">Tüm dersler</option>'+subjects.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
-     const names=['Pazartesi','Salı','Çarşamba','Perşembe','Cuma'];document.getElementById('manualDay').innerHTML=names.map((n,i)=>{const d=typeof addDaysISO==='function'?addDaysISO(week,i):week;return '<option value="'+d+'">'+n+' • '+fmtDate(d)+'</option>'}).join('');
-     manualLoadTopics();renderManualHistory();document.getElementById('manualAddedInfo').textContent='';
+     E('manualDay').value='';manualPortal.hidden=true;E('manualFormHome').appendChild(manualPortal);manualPortal.querySelector('#manualFormTitle').textContent='';
+     manualLoadTopics();renderManualHistory();renderManualWeek();document.getElementById('manualAddedInfo').textContent='';
    }catch(e){box.textContent='Bilgiler alınamadı.';alert('Elle program ekranı açılamadı: '+(e?.message||e))}
  };
  window.renderManualHistory=function(){if(!ctx)return;const f=document.getElementById('manualHistorySubject').value;const rows=ctx.catalog.filter(x=>!f||x.subject===f);document.getElementById('manualHistory').innerHTML=rows.length?rows.map(x=>{const p=topicProgress(x.id),h=topicHistory(x.subject,x.topic),pct=p?.progress_percent||0,status=p?.status==='completed'?'✓ Tamamlandı':p?.status==='review_needed'?'↻ Tekrar gerekli':p?.status==='in_progress'?'▶ Çalışılıyor':'Başlanmadı';return '<div class="manualHistoryItem"><b>'+esc(x.subject)+' — '+esc(x.topic)+'</b><span class="manualProgress">%'+pct+'</span> • '+status+'<div class="manualMeta">'+(h?'Daha önce programlandı • Son: '+fmtDate(h.task_date):'Henüz programa verilmedi')+'</div></div>'}).join(''):'Bu filtrede konu bulunamadı.'};
- window.manualLoadTopics=function(){if(!ctx)return;const s=document.getElementById('manualSubject').value,rows=ctx.catalog.filter(x=>x.subject===s);document.getElementById('manualTopic').innerHTML=rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.topic)+'</option>').join('');manualTopicChanged()};
+ function renderManualWeek(){
+  if(!ctx)return;
+  const board=E('manualWeekBoard'),selected=E('manualDay').value;
+  manualPortal.remove();
+  const names=['Pazartesi','Salı','Çarşamba','Perşembe','Cuma'];
+  board.innerHTML=names.map((name,i)=>{
+   const date=typeof addDaysISO==='function'?addDaysISO(ctx.week,i):ctx.week;
+   const tasks=ctx.tasks.filter(t=>t.task_date===date).sort((a,b)=>String(a.start_time||'').localeCompare(String(b.start_time||'')));
+   const list=tasks.length?tasks.map(t=>'<div class="manualDayTask"><time>'+esc(String(t.start_time||'').slice(0,5))+(t.end_time?'–'+esc(String(t.end_time).slice(0,5)):'')+'</time><span><b>'+esc(t.subject||'')+'</b> — '+esc(t.topic||'')+(t.status==='completed'?' <span class="done">✓ Tamamlandı</span>':'')+'</span></div>').join(''):'<div class="manualDayEmpty">Henüz ders eklenmedi.</div>';
+   const action=ctx.locked?'<div class="manualLocked">Bu program yayınlanmış; bu ekrandan düzenlenemez.</div>':'<button type="button" class="secondary small manualDayAdd" onclick="openManualDay(\''+date+'\')">＋ Ders Ekle</button>';
+   return '<section class="manualDayCard '+(selected===date?'chosen':'')+'" data-manual-card="'+date+'"><div class="manualDayHead"><span>'+name+'</span><span>'+esc(fmtDate(date))+'</span></div><div class="manualDayTasks">'+list+'</div>'+action+'</section>';
+  }).join('');
+  if(selected&&!ctx.locked){const target=board.querySelector('[data-manual-card="'+selected+'"]'),card=target?.closest('.manualDayCard');if(card){manualPortal.hidden=false;card.appendChild(manualPortal);manualPortal.querySelector('#manualFormTitle').textContent='Ders ekle • '+names[(new Date(selected+'T12:00:00').getDay()+6)%7]+' • '+fmtDate(selected);const button=E('manualAddBtn');if(button)button.textContent='➕ Bu Güne Ekle';}else{manualPortal.hidden=true;E('manualFormHome').appendChild(manualPortal);}}else{manualPortal.hidden=true;E('manualFormHome').appendChild(manualPortal);}
+ }
+ window.openManualDay=function(date){if(!ctx||ctx.locked)return;const weekEnd=typeof addDaysISO==='function'?addDaysISO(ctx.week,4):ctx.week;if(date<ctx.week||date>weekEnd)return;E('manualDay').value=date;E('manualAddedInfo').textContent='';renderManualWeek();manualPortal.scrollIntoView({behavior:'smooth',block:'nearest'});E('manualSubject').focus()};
+ window.manualLoadTopics=function(){if(!ctx)return;const s=document.getElementById('manualSubject').value,rows=ctx.catalog.filter(x=>x.subject===s);document.getElementById('manualTopic').innerHTML=rows.length?rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.topic)+'</option>').join(''):'<option value="">Bitmemiş konu bulunamadı</option>';manualTopicChanged()};
  window.manualTopicChanged=function(){if(!ctx)return;const id=document.getElementById('manualTopic').value,p=topicProgress(id);document.getElementById('manualProgressPreview').value='İlerleme: %'+(p?.progress_percent||0)};
  window.saveManualPlanTask=async function(){
   if(!ctx||!canManagePlans())return;
   const btn=document.getElementById('manualAddBtn'),topicId=document.getElementById('manualTopic').value;
   try{
+   if(ctx.locked)throw new Error('Yayınlanmış haftaya elle ders eklenemez.');
    if(btn.disabled)return;btn.disabled=true;
-   const fresh=await fetchLearningData(ctx.student.id),row=ODEVLearningCore.next(fresh).find(x=>String(x.id)===String(topicId));
-   if(!row)throw new Error('Bu konu bitti, sıradaki konu değil veya liste değişti. Ekranı yeniden açın.');
+   const fresh=await getCatalogForStudent(ctx.student),row=(fresh||[]).find(x=>String(x.id)===String(topicId));
+   if(!row)throw new Error('Bu konu bitmiş veya öğrencinin aktif konu listesinde değil. Listeyi yenileyip tekrar deneyin.');
    const day=document.getElementById('manualDay').value,start=document.getElementById('manualStart').value,end=document.getElementById('manualEnd').value,q=document.getElementById('manualQuestions').value;
+   if(!day)throw new Error('Önce haftalık görünümde günün içindeki “Ders Ekle” düğmesine basın.');
    const task={task_date:day,start_time:start,end_time:end,subject:row.subject,topic:row.topic,description:document.getElementById('manualDescription').value.trim()||'Elle hazırlanan çalışma',target_questions:q===''?null:Number(q)};
    const rules=await integrityGetRules(ctx.student);
    integrityValidateTasks([task],ctx.student,ctx.week,rules);
    await integritySaveWeek(ctx.student.id,ctx.week,[task],'append');
    ctx.history.set(norm(row.subject)+'|'+norm(row.topic),{...task,status:'pending'});
-   document.getElementById('manualAddedInfo').textContent='✓ '+row.subject+' — '+row.topic+' programa eklendi.';renderManualHistory();
-  }catch(e){alert('Ders eklenemedi: '+(e.message||e))}finally{btn.disabled=false;btn.textContent='➕ Programa Ekle'}
+   ctx.tasks.push({...task,status:'pending'});document.getElementById('manualQuestions').value='';document.getElementById('manualDescription').value='';
+   document.getElementById('manualAddedInfo').textContent='✓ '+row.subject+' — '+row.topic+' '+fmtDate(day)+' gününe eklendi.';renderManualHistory();renderManualWeek();
+  }catch(e){alert('Ders eklenemedi: '+(e.message||e))}finally{btn.disabled=false;btn.textContent='➕ Bu Güne Ekle'}
  };
  window.finishManualPlan=async function(){closeModal('manualPlanModal');if(typeof loadScheduleForStudent==='function')await loadScheduleForStudent()};
  function addChoice(){const content=document.getElementById('scheduleContent');if(!content||document.getElementById('manualPlanChoice'))return;const bar=document.createElement('div');bar.id='manualPlanChoice';bar.className='manualPlanChoice';bar.innerHTML='<b>Program Hazırlama:</b> <button class="primary" type="button" onclick="openAIForSchedule()">🤖 Yapay Zekâ ile Hazırla</button><button class="green" type="button" onclick="openManualPlan()">✍️ Elle Program Hazırla</button><span class="info">AI sorun çıkarırsa elle hazırlamaya geçebilirsiniz; mevcut geçmiş ve ilerleme korunur.</span>';content.insertAdjacentElement('beforebegin',bar)}
